@@ -11,7 +11,7 @@ vi.mock('../works/useWorksData.js', () => ({
 vi.mock('../board/volumeApi.js', () => ({
   getBoard: vi.fn().mockResolvedValue({
     volume: { id: 'v1', number: 3, title: '성장', status: '선정중' },
-    works: [], tasks: [],
+    works: [], tasks: [], parts: [],
   }),
   listMembers: vi.fn().mockResolvedValue([]),
   listRegistry: vi.fn().mockResolvedValue([]),
@@ -21,6 +21,7 @@ vi.mock('../board/volumeApi.js', () => ({
   addWorkToVolume: vi.fn(), updateVolumeWork: vi.fn(), deleteVolumeWork: vi.fn(),
   applySortSwap: vi.fn(), addTasks: vi.fn(), updateTask: vi.fn(), deleteTask: vi.fn(),
   listActivityFor: vi.fn().mockResolvedValue([]),
+  createPart: vi.fn(), updatePart: vi.fn(), deletePart: vi.fn(),
 }))
 const { default: VolumeBoardPage } = await import('../board/VolumeBoardPage.jsx')
 const { ToastProvider } = await import('../components/Toast.jsx')
@@ -38,4 +39,16 @@ test('권 헤더·검색 패널·수록 목록이 함께 렌더링된다', async
   expect(screen.getByText('성장')).toBeInTheDocument()
   expect(screen.getByPlaceholderText(/작품명·작가/)).toBeInTheDocument()
   expect(screen.getByText('표시할 작품이 없습니다')).toBeInTheDocument()
+})
+
+test('부 관리 버튼이 보드에 렌더링된다', async () => {
+  window.location.hash = '#/volumes/v1'
+  render(
+    <ToastProvider>
+      <HashRouter>
+        <Routes><Route path="/volumes/:id" element={<VolumeBoardPage />} /></Routes>
+      </HashRouter>
+    </ToastProvider>,
+  )
+  await waitFor(() => expect(screen.getByRole('button', { name: '부 관리' })).toBeInTheDocument())
 })

@@ -8,6 +8,7 @@ import * as api from './volumeApi.js'
 import SearchPane from './SearchPane.jsx'
 import VolumeWorkList from './VolumeWorkList.jsx'
 import WorkDetailPanel from './WorkDetailPanel.jsx'
+import PartControls from './PartControls.jsx'
 import { useToast } from '../components/Toast.jsx'
 
 const VOLUME_STATUSES = ['기획', '선정중', '확정', '제작중', '완료']
@@ -22,6 +23,13 @@ export default function VolumeBoardPage() {
   const [registry, setRegistry] = useState([])
   const [allVw, setAllVw] = useState([])
   const [selectedId, setSelectedId] = useState(null)
+  const [activePart, setActivePart] = useState('all')
+
+  useEffect(() => {
+    if (activePart !== 'all' && activePart !== 'none' && !board.parts.some(p => p.id === activePart)) {
+      setActivePart('all')
+    }
+  }, [board.parts, activePart])
 
   const loadDupData = useCallback(() => {
     api.listRegistry().then(setRegistry).catch(() => {})
@@ -53,7 +61,8 @@ export default function VolumeBoardPage() {
   }, [registry, duplicatesByWorkId])
 
   async function handleAdd(work, curricula) {
-    const row = await board.actions.addWork(work, curricula, registryMap)
+    const partId = activePart !== 'all' && activePart !== 'none' ? activePart : null
+    const row = await board.actions.addWork(work, curricula, registryMap, partId)
     if (row) setSelectedId(row.id)
   }
 
@@ -78,6 +87,9 @@ export default function VolumeBoardPage() {
   const selectedDups = selectedVw
     ? (duplicatesByWorkId.get(selectedVw.work_id) || []).filter(d => d.volumeId !== volumeId)
     : []
+  const visibleWorks = activePart === 'all'
+    ? board.works
+    : board.works.filter(w => (activePart === 'none' ? !w.part_id : w.part_id === activePart))
 
   return (
     <div className="flex h-[calc(100vh-7rem)] flex-col">
@@ -113,8 +125,17 @@ export default function VolumeBoardPage() {
         </div>
 
         <div className="min-w-0 flex-1 rounded border border-gray-200 p-3">
+          <PartControls
+            parts={board.parts}
+            activePart={activePart}
+            onSelect={setActivePart}
+            onAddPart={board.actions.addPart}
+            onRenamePart={board.actions.renamePart}
+            onRemovePart={board.actions.removePart}
+          />
           <VolumeWorkList
-            works={board.works}
+            works={visibleWorks}
+            parts={activePart === 'all' ? board.parts : []}
             tasksByVw={board.tasksByVw}
             members={board.members}
             selectedId={selectedId}
@@ -129,6 +150,7 @@ export default function VolumeBoardPage() {
             tasks={board.tasksByVw[selectedVw.id] || EMPTY_TASKS}
             members={board.members}
             duplicates={selectedDups}
+            parts={board.parts}
             actions={board.actions}
             onClose={() => setSelectedId(null)}
           />

@@ -56,3 +56,13 @@ test('모든 업무 완료 시 제작 완료 제안이 뜬다', async () => {
   await userEvent.click(screen.getByRole('button', { name: '완료로 변경' }))
   expect(actions.setVolumeWork).toHaveBeenCalledWith('vw1', { production_status: 'completed' })
 })
+
+test('부가 있으면 부 지정 select를 보여주고 변경을 전달한다', async () => {
+  const actions = makeActions()
+  const parts = [{ id: 'p1', number: 1, title: '시' }]
+  render(<WorkDetailPanel volumeWork={{ ...VW, part_id: null }} tasks={[]} members={MEMBERS}
+    duplicates={[]} parts={parts} actions={actions} onClose={() => {}} />)
+  const select = screen.getByLabelText('부 지정')
+  await userEvent.selectOptions(select, 'p1')
+  expect(actions.setVolumeWork).toHaveBeenCalledWith('vw1', { part_id: 'p1' })
+})

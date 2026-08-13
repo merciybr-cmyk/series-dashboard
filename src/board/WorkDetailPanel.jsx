@@ -1,7 +1,7 @@
 // 작품 상세 패널 (설계 §5.1): 정보 / 선정 / 제작(업무 체크리스트) / 이력
 import { useEffect, useMemo, useState } from 'react'
 import { SELECTION_LABELS, PRODUCTION_LABELS, TASK_PRESETS } from './constants.js'
-import { tasksProgress, daysUntil, dDayLabel } from './boardUtils.js'
+import { tasksProgress, daysUntil, dDayLabel, partLabel } from './boardUtils.js'
 import { listActivityFor } from './volumeApi.js'
 
 function Section({ title, children }) {
@@ -13,7 +13,7 @@ function Section({ title, children }) {
   )
 }
 
-export default function WorkDetailPanel({ volumeWork: vw, tasks, members, duplicates, actions, onClose }) {
+export default function WorkDetailPanel({ volumeWork: vw, tasks, members, duplicates, parts = [], actions, onClose }) {
   const [adding, setAdding] = useState(false)
   const [picked, setPicked] = useState([])       // 프리셋 type 배열
   const [customTitle, setCustomTitle] = useState('')
@@ -75,6 +75,21 @@ export default function WorkDetailPanel({ volumeWork: vw, tasks, members, duplic
             {Object.entries(SELECTION_LABELS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
           </select>
         </div>
+        {parts.length > 0 && (
+          <div className="mb-2 flex items-center gap-2">
+            <label className="text-sm" htmlFor="part-select">부 지정</label>
+            <select
+              id="part-select"
+              aria-label="부 지정"
+              value={vw.part_id || ''}
+              onChange={e => actions.setVolumeWork(vw.id, { part_id: e.target.value || null })}
+              className="rounded border border-gray-300 px-2 py-1 text-sm"
+            >
+              <option value="">미배정</option>
+              {parts.map(p => <option key={p.id} value={p.id}>{partLabel(p)}</option>)}
+            </select>
+          </div>
+        )}
         <textarea
           value={note}
           onChange={e => setNote(e.target.value)}
