@@ -59,3 +59,10 @@ test('listVolumes: 오류면 throw', async () => {
   fromResults.push({ data: null, error: { message: 'boom' } })
   await expect(api.listVolumes()).rejects.toThrow('boom')
 })
+
+test('ensureWorkId: 23505 경합이면 재조회로 기존 ID를 받는다', async () => {
+  fromResults.push({ data: null, error: { code: '23505', message: 'duplicate' } }) // insert 실패
+  fromResults.push({ data: { work_id: 'W000009' }, error: null })                 // 재조회 성공
+  const id = await api.ensureWorkId(WORK, ['7차'], new Map())
+  expect(id).toBe('W000009')
+})
