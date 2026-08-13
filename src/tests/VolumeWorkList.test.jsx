@@ -35,3 +35,15 @@ test('▼를 누르면 onMove(id, "down")', async () => {
   await userEvent.click(screen.getAllByRole('button', { name: '아래로' })[0])
   expect(onMove).toHaveBeenCalledWith('vw1', 'down')
 })
+
+test('parts가 있으면 부별 그룹 헤더를 표시한다', () => {
+  const parts = [{ id: 'p1', number: 1, title: '시' }]
+  const worksWithPart = [
+    { ...WORKS[0], part_id: 'p1' },
+    { ...WORKS[1], part_id: null },
+  ]
+  render(<VolumeWorkList works={worksWithPart} tasksByVw={TASKS} members={[]} parts={parts}
+    selectedId={null} onSelect={() => {}} onMove={() => {}} />)
+  expect(screen.getByText('1부 시')).toBeInTheDocument()
+  expect(screen.getByText('미배정')).toBeInTheDocument()
+})
