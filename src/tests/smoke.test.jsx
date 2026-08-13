@@ -1,7 +1,21 @@
-import { render, screen } from '@testing-library/react'
-import App from '../App.jsx'
+import { render, screen, waitFor } from '@testing-library/react'
+import { vi } from 'vitest'
 
-test('앱 제목이 렌더링된다', () => {
+vi.mock('../lib/supabaseClient', () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+      onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
+    },
+    from: vi.fn(),
+  },
+}))
+
+const { default: App } = await import('../App.jsx')
+
+test('미로그인 상태에서 로그인 화면이 보인다', async () => {
   render(<App />)
-  expect(screen.getByText('단행본 시리즈 대시보드')).toBeInTheDocument()
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: '로그인 링크 받기' })).toBeInTheDocument(),
+  )
 })
