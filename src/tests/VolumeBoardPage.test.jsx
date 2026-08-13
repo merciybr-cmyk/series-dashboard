@@ -1,0 +1,41 @@
+import { render, screen, waitFor } from '@testing-library/react'
+import { HashRouter, Routes, Route } from 'react-router-dom'
+import { vi } from 'vitest'
+
+vi.mock('../works/useWorksData.js', () => ({
+  useWorksData: () => ({
+    works: [{ '작품명': '소나기', '지은이': '황순원', _authorBase: '황순원', '장르': '소설', '교육과정': '7차', _titleChosung: 'ㅅㄴㄱ', _authorChosung: 'ㅎㅅㅇ' }],
+    loading: false, error: null, retry: () => {},
+  }),
+}))
+vi.mock('../board/volumeApi.js', () => ({
+  getBoard: vi.fn().mockResolvedValue({
+    volume: { id: 'v1', number: 3, title: '성장', status: '선정중' },
+    works: [], tasks: [],
+  }),
+  listMembers: vi.fn().mockResolvedValue([]),
+  listRegistry: vi.fn().mockResolvedValue([]),
+  listAllVolumeWorks: vi.fn().mockResolvedValue([]),
+  subscribeBoard: vi.fn(() => () => {}),
+  updateVolume: vi.fn(),
+  addWorkToVolume: vi.fn(), updateVolumeWork: vi.fn(), deleteVolumeWork: vi.fn(),
+  applySortSwap: vi.fn(), addTasks: vi.fn(), updateTask: vi.fn(), deleteTask: vi.fn(),
+  listActivityFor: vi.fn().mockResolvedValue([]),
+}))
+const { default: VolumeBoardPage } = await import('../board/VolumeBoardPage.jsx')
+const { ToastProvider } = await import('../components/Toast.jsx')
+
+test('권 헤더·검색 패널·수록 목록이 함께 렌더링된다', async () => {
+  window.location.hash = '#/volumes/v1'
+  render(
+    <ToastProvider>
+      <HashRouter>
+        <Routes><Route path="/volumes/:id" element={<VolumeBoardPage />} /></Routes>
+      </HashRouter>
+    </ToastProvider>,
+  )
+  await waitFor(() => expect(screen.getByText(/3권/)).toBeInTheDocument())
+  expect(screen.getByText('성장')).toBeInTheDocument()
+  expect(screen.getByPlaceholderText(/작품명·작가/)).toBeInTheDocument()
+  expect(screen.getByText('표시할 작품이 없습니다')).toBeInTheDocument()
+})
