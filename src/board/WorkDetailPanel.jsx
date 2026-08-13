@@ -86,6 +86,7 @@ export default function WorkDetailPanel({ volumeWork: vw, tasks, members, duplic
       </Section>
 
       <Section title={`제작 진행 ${total ? `(${done}/${total})` : ''}`}>
+        <div className={vw.selection_status === 'excluded' ? 'opacity-40' : ''}>
         <div className="mb-2 flex items-center gap-2">
           <label className="text-sm" htmlFor="prod-status">제작 상태</label>
           <select id="prod-status" value={vw.production_status}
@@ -171,6 +172,7 @@ export default function WorkDetailPanel({ volumeWork: vw, tasks, members, duplic
             업무 추가
           </button>
         )}
+        </div>
       </Section>
 
       <Section title="최근 변경">

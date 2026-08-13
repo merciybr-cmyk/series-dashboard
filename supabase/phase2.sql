@@ -31,3 +31,19 @@ create trigger volume_parts_log after insert or update or delete on public.volum
   for each row execute function public.log_activity();
 
 alter publication supabase_realtime add table public.volume_parts;
+
+-- (3) works_registry의 created_by 자동 기록 (설계 §6.4 — 클라이언트 입력을 믿지 않는다)
+-- set_audit_fields는 updated_* 컬럼을 요구하므로 registry 전용 함수를 둔다.
+create function public.set_registry_created_by()
+returns trigger
+language plpgsql security definer
+set search_path = public
+as $$
+begin
+  new.created_by := public.current_member_id();
+  return new;
+end;
+$$;
+
+create trigger works_registry_created_by before insert on public.works_registry
+  for each row execute function public.set_registry_created_by();

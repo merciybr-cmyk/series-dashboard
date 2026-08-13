@@ -14,6 +14,7 @@ export function useVolumeBoard(volumeId) {
   const [error, setError] = useState(null)
   const { show } = useToast()
   const debounceRef = useRef(null)
+  const hasLoadedRef = useRef(false)
 
   const reload = useCallback(async () => {
     try {
@@ -22,12 +23,17 @@ export function useVolumeBoard(volumeId) {
       setWorks(board.works)
       setTasks(board.tasks)
       setError(null)
+      hasLoadedRef.current = true
     } catch (err) {
-      setError(err.message)
+      if (hasLoadedRef.current) {
+        show(err.message)
+      } else {
+        setError(err.message)
+      }
     } finally {
       setLoading(false)
     }
-  }, [volumeId])
+  }, [volumeId, show])
 
   useEffect(() => {
     setLoading(true)

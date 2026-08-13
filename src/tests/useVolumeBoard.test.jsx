@@ -81,3 +81,28 @@ test('Realtime 이벤트가 오면 다시 로드한다', async () => {
   expect(api.getBoard).toHaveBeenCalledTimes(2)
   vi.useRealTimers()
 })
+
+function ProbeWithError() {
+  const { volume, works, loading, error } = useVolumeBoard('v1')
+  if (loading) return <div>로딩</div>
+  return <div>권:{volume.number} 작품수:{works.length} 에러:{error || '없음'}</div>
+}
+
+test('로드 후 배경 재조회 실패는 에러 화면으로 대체하지 않고 토스트로만 알린다', async () => {
+  vi.useFakeTimers()
+  api.getBoard.mockResolvedValueOnce(BOARD).mockRejectedValueOnce(new Error('네트워크 오류'))
+  let fire
+  api.subscribeBoard.mockImplementation(cb => { fire = cb; return () => {} })
+  render(<ToastProvider><ProbeWithError /></ToastProvider>)
+  await act(async () => { await vi.runOnlyPendingTimersAsync() })
+  expect(screen.getByText('권:3 작품수:1 에러:없음')).toBeInTheDocument()
+
+  act(() => { fire({}) })
+  await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+
+  // 로드가 이미 성공한 뒤의 실패이므로 화면은 그대로 유지되고 (에러 상태로 대체되지 않음)
+  expect(screen.getByText('권:3 작품수:1 에러:없음')).toBeInTheDocument()
+  // 대신 토스트로 알린다
+  expect(screen.getByText('네트워크 오류')).toBeInTheDocument()
+  vi.useRealTimers()
+})

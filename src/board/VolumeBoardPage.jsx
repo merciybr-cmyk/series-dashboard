@@ -67,7 +67,12 @@ export default function VolumeBoardPage() {
   }
 
   if (board.loading) return <p className="text-gray-500">불러오는 중…</p>
-  if (board.error) return <p className="text-red-600">권을 불러올 수 없습니다: {board.error}</p>
+  if (board.error) return (
+    <p className="text-red-600">
+      권을 불러올 수 없습니다: {board.error}
+      <button type="button" onClick={board.actions.reload} className="ml-2 rounded border px-3 py-1 text-sm">다시 시도</button>
+    </p>
+  )
 
   const selectedVw = board.works.find(w => w.id === selectedId) || null
   const selectedDups = selectedVw

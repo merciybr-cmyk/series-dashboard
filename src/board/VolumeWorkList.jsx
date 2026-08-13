@@ -77,12 +77,12 @@ export default function VolumeWorkList({ works, tasksByVw, members, selectedId, 
               <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs ${SELECTION_BADGE[vw.selection_status]}`}>
                 {SELECTION_LABELS[vw.selection_status]}
               </span>
-              <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs ${PRODUCTION_BADGE[vw.production_status]}`}>
+              <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs ${PRODUCTION_BADGE[vw.production_status]} ${vw.selection_status === 'excluded' ? 'opacity-40' : ''}`}>
                 {PRODUCTION_LABELS[vw.production_status]}
               </span>
-              {total > 0 && <span className="shrink-0 text-xs text-gray-600">{done}/{total}</span>}
+              {total > 0 && <span className={`shrink-0 text-xs text-gray-600 ${vw.selection_status === 'excluded' ? 'opacity-40' : ''}`}>{done}/{total}</span>}
               {due && (
-                <span className={`shrink-0 text-xs ${daysUntil(due) < 0 ? 'text-red-600' : 'text-gray-500'}`}>
+                <span className={`shrink-0 text-xs ${daysUntil(due) < 0 ? 'text-red-600' : 'text-gray-500'} ${vw.selection_status === 'excluded' ? 'opacity-40' : ''}`}>
                   {dDayLabel(daysUntil(due))}
                 </span>
               )}
