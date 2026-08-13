@@ -105,7 +105,7 @@ export default function VolumeWorkList({ works, tasksByVw, members, parts = [], 
             )}
             <ul className="space-y-1">
               {g.works.map(renderRow)}
-              {!g.works.length && <li className="py-1 text-xs text-gray-300">이 부에 작품이 없습니다</li>}
+              {parts.length > 0 && !g.works.length && <li className="py-1 text-xs text-gray-300">이 부에 작품이 없습니다</li>}
             </ul>
           </li>
         ))}

@@ -47,3 +47,11 @@ test('parts가 있으면 부별 그룹 헤더를 표시한다', () => {
   expect(screen.getByText('1부 시')).toBeInTheDocument()
   expect(screen.getByText('미배정')).toBeInTheDocument()
 })
+
+test('부가 없고 필터 결과가 0건이면 빈 문구가 하나만 보인다', async () => {
+  render(<VolumeWorkList works={WORKS} tasksByVw={TASKS} members={[]} selectedId={null} onSelect={() => {}} onMove={() => {}} />)
+  await userEvent.click(screen.getByRole('button', { name: /선정 상태/ }))
+  await userEvent.click(screen.getByLabelText('보류'))
+  expect(screen.getByText('표시할 작품이 없습니다')).toBeInTheDocument()
+  expect(screen.queryByText('이 부에 작품이 없습니다')).not.toBeInTheDocument()
+})
