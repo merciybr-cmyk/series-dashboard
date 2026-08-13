@@ -17,9 +17,11 @@
 1. Authentication → Providers → Email: **Enable email provider** 켜기,
    **Confirm email** 끄기(매직 링크만 사용)
 2. Authentication → URL Configuration:
-   - Site URL: `https://<GitHub계정>.github.io/series-dashboard/`
-   - Redirect URLs에 추가: `http://localhost:5173`, `http://localhost:5173/**`,
-     `https://<GitHub계정>.github.io/series-dashboard/**`
+   - Site URL: `https://merciybr-cmyk.github.io/series-dashboard/`
+   - Redirect URLs에 아래 3줄을 각각 추가:
+     - `http://localhost:5173`
+     - `http://localhost:5173/**`
+     - `https://merciybr-cmyk.github.io/series-dashboard/**`
 
 ## 4. Gmail SMTP (설계 §6.2 — 필수)
 1. Google 계정 → 보안 → 2단계 인증 켜기 → 앱 비밀번호 생성 (이름: supabase)
