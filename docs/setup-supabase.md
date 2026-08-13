@@ -25,7 +25,8 @@
 
 ## 4. Gmail SMTP (설계 §6.2 — 필수)
 1. Google 계정 → 보안 → 2단계 인증 켜기 → 앱 비밀번호 생성 (이름: supabase)
-2. Supabase → Project Settings → Auth → SMTP Settings → Enable custom SMTP:
+2. Supabase → 왼쪽 사이드바 Authentication → Emails → **SMTP Settings 탭** → Enable Custom SMTP 켜기
+   (메뉴가 안 보이면 Ctrl+K 검색창에 `SMTP` 입력):
    - Host `smtp.gmail.com`, Port `465`
    - Username: Gmail 주소, Password: 앱 비밀번호
    - Sender email: 같은 Gmail 주소, Sender name: `단행본 시리즈 대시보드`
