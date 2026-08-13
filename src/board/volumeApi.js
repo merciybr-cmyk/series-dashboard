@@ -21,10 +21,17 @@ export async function updateVolume(id, patch) {
   return unwrap(await supabase.from('volumes').update(patch).eq('id', id).select().single())
 }
 
+export async function deleteVolume(id) {
+  unwrap(await supabase.from('volumes').delete().eq('id', id))
+}
+
 // ---------- 보드 로드 ----------
 
 export async function getBoard(volumeId) {
   const volume = unwrap(await supabase.from('volumes').select('*').eq('id', volumeId).single())
+  const parts = unwrap(
+    await supabase.from('volume_parts').select('*').eq('volume_id', volumeId).order('number'),
+  )
   const works = unwrap(
     await supabase.from('volume_works').select('*').eq('volume_id', volumeId).order('sort_order'),
   )
@@ -32,7 +39,7 @@ export async function getBoard(volumeId) {
   const tasks = ids.length
     ? unwrap(await supabase.from('work_tasks').select('*').in('volume_work_id', ids).order('sort_order'))
     : []
-  return { volume, works, tasks }
+  return { volume, parts, works, tasks }
 }
 
 // 중복 수록 뱃지용: 전체 권의 수록 현황 (권 번호 포함)
@@ -71,15 +78,34 @@ export async function ensureWorkId(work, curricula, registryMap) {
   throw new Error(error.message)
 }
 
+// ---------- volume_parts (부) ----------
+
+export async function createPart(volumeId, number) {
+  return unwrap(
+    await supabase.from('volume_parts')
+      .insert({ volume_id: volumeId, number, sort_order: number * 10 })
+      .select().single(),
+  )
+}
+
+export async function updatePart(id, patch) {
+  return unwrap(await supabase.from('volume_parts').update(patch).eq('id', id).select().single())
+}
+
+export async function deletePart(id) {
+  unwrap(await supabase.from('volume_parts').delete().eq('id', id))
+}
+
 // ---------- volume_works ----------
 
-export async function addWorkToVolume({ volumeId, work, curricula, registryMap, sortOrder }) {
+export async function addWorkToVolume({ volumeId, work, curricula, registryMap, sortOrder, partId }) {
   const workId = await ensureWorkId(work, curricula, registryMap)
   const { data, error } = await supabase.from('volume_works').insert({
     volume_id: volumeId,
     work_id: workId,
     work_snapshot: snapshotOf(work, curricula),
     sort_order: sortOrder,
+    part_id: partId ?? null,
   }).select().single()
   if (error) {
     if (error.code === '23505') throw new Error('이미 이 권에 있는 작품입니다')
@@ -138,6 +164,7 @@ export async function listActivityFor(recordIds) {
 
 export function subscribeBoard(onChange) {
   const ch = supabase.channel('board-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'volume_parts' }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'volume_works' }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'work_tasks' }, onChange)
     .subscribe()

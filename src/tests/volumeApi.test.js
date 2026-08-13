@@ -66,3 +66,25 @@ test('ensureWorkId: 23505 경합이면 재조회로 기존 ID를 받는다', asy
   const id = await api.ensureWorkId(WORK, ['7차'], new Map())
   expect(id).toBe('W000009')
 })
+
+test('createPart: 번호 기반 sort_order로 insert한다', async () => {
+  fromResults.push({ data: { id: 'p1', number: 2, sort_order: 20 }, error: null })
+  const part = await api.createPart('v1', 2)
+  expect(part.number).toBe(2)
+  expect(mockSupabase.from).toHaveBeenCalledWith('volume_parts')
+})
+
+test('addWorkToVolume: partId를 part_id로 넘긴다 (미지정이면 null)', async () => {
+  fromResults.push({ data: { work_id: 'W000001' }, error: null }) // registry insert
+  fromResults.push({ data: { id: 'vw1', part_id: 'p1' }, error: null }) // volume_works insert
+  const row = await api.addWorkToVolume({
+    volumeId: 'v1', work: WORK, curricula: [], registryMap: new Map(), sortOrder: 10, partId: 'p1',
+  })
+  expect(row.part_id).toBe('p1')
+})
+
+test('deleteVolume/deletePart/updatePart가 존재한다', () => {
+  expect(typeof api.deleteVolume).toBe('function')
+  expect(typeof api.deletePart).toBe('function')
+  expect(typeof api.updatePart).toBe('function')
+})
