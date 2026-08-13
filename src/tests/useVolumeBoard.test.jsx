@@ -1,0 +1,83 @@
+import { render, screen, waitFor, act } from '@testing-library/react'
+import { vi } from 'vitest'
+
+vi.mock('../board/volumeApi.js', () => ({
+  getBoard: vi.fn(),
+  listMembers: vi.fn().mockResolvedValue([{ id: 'm1', name: '김편집' }]),
+  subscribeBoard: vi.fn(() => () => {}),
+  addWorkToVolume: vi.fn(),
+  updateVolumeWork: vi.fn(),
+  deleteVolumeWork: vi.fn(),
+  applySortSwap: vi.fn(),
+  addTasks: vi.fn(),
+  updateTask: vi.fn(),
+  deleteTask: vi.fn(),
+}))
+const api = await import('../board/volumeApi.js')
+const { useVolumeBoard } = await import('../board/useVolumeBoard.js')
+const { ToastProvider } = await import('../components/Toast.jsx')
+
+// vi.mock 팩토리의 mock 함수들은 파일 내 테스트 간 호출 이력이 누적된다(clearMocks 미설정 환경).
+// getBoard 호출 횟수를 테스트별로 독립 검증하기 위해 매 테스트 전 호출 이력만 초기화한다
+// (mockResolvedValue 등 각 테스트가 직접 설정하는 구현은 mockClear로 지워지지 않음).
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+
+const BOARD = {
+  volume: { id: 'v1', number: 3, title: '성장' },
+  works: [{ id: 'vw1', volume_id: 'v1', work_id: 'W000001', sort_order: 10, selection_status: 'candidate', production_status: 'not_started', work_snapshot: { title: '소나기', author: '황순원' } }],
+  tasks: [{ id: 't1', volume_work_id: 'vw1', status: 'todo', title: '해제 작성' }],
+}
+
+function Probe() {
+  const { volume, works, tasksByVw, loading, actions } = useVolumeBoard('v1')
+  if (loading) return <div>로딩</div>
+  return (
+    <div>
+      <div>권:{volume.number} 작품수:{works.length} vw1업무:{(tasksByVw.vw1 || []).length}</div>
+      <button onClick={() => actions.setTask('t1', { status: 'done' })}>완료</button>
+    </div>
+  )
+}
+
+function renderProbe() {
+  return render(<ToastProvider><Probe /></ToastProvider>)
+}
+
+test('보드를 로드해 works/tasksByVw를 제공한다', async () => {
+  api.getBoard.mockResolvedValue(BOARD)
+  renderProbe()
+  await waitFor(() => expect(screen.getByText('권:3 작품수:1 vw1업무:1')).toBeInTheDocument())
+})
+
+test('setTask 성공 시 로컬 상태를 패치한다', async () => {
+  api.getBoard.mockResolvedValue(BOARD)
+  api.updateTask.mockResolvedValue({ ...BOARD.tasks[0], status: 'done' })
+  renderProbe()
+  await waitFor(() => screen.getByText('완료'))
+  await act(() => screen.getByText('완료').click())
+  expect(api.updateTask).toHaveBeenCalledWith('t1', { status: 'done' })
+})
+
+test('실패하면 reload로 롤백한다', async () => {
+  api.getBoard.mockResolvedValue(BOARD)
+  api.updateTask.mockRejectedValue(new Error('네트워크 오류'))
+  renderProbe()
+  await waitFor(() => screen.getByText('완료'))
+  await act(() => screen.getByText('완료').click())
+  await waitFor(() => expect(api.getBoard).toHaveBeenCalledTimes(2)) // 초기 1 + 롤백 1
+})
+
+test('Realtime 이벤트가 오면 다시 로드한다', async () => {
+  vi.useFakeTimers()
+  api.getBoard.mockResolvedValue(BOARD)
+  let fire
+  api.subscribeBoard.mockImplementation(cb => { fire = cb; return () => {} })
+  renderProbe()
+  await act(async () => { await vi.runOnlyPendingTimersAsync() })
+  act(() => { fire({}); fire({}) }) // 연속 2회 → 디바운스로 1회만
+  await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+  expect(api.getBoard).toHaveBeenCalledTimes(2)
+  vi.useRealTimers()
+})
