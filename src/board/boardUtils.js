@@ -67,3 +67,28 @@ export function filterVolumeWorks(rows, tasksByVw, filters = {}, now = new Date(
     return true
   })
 }
+
+// ---------- 부(部) 유틸 (설계 §4 volume_parts) ----------
+
+export function partLabel(part) {
+  return part.title ? `${part.number}부 ${part.title}` : `${part.number}부`
+}
+
+export function nextPartNumber(parts) {
+  if (!parts.length) return 1
+  return Math.max(...parts.map(p => p.number)) + 1
+}
+
+// 부가 없으면 단일 그룹. 있으면 번호순 부 그룹(빈 부 포함) + 미배정 그룹(해당 작품 있을 때만).
+export function groupByPart(works, parts) {
+  if (!parts.length) return [{ part: null, works }]
+  const byId = new Map(parts.map(p => [p.id, []]))
+  const unassigned = []
+  for (const w of works) {
+    if (byId.has(w.part_id)) byId.get(w.part_id).push(w)
+    else unassigned.push(w)
+  }
+  const groups = parts.map(p => ({ part: p, works: byId.get(p.id) }))
+  if (unassigned.length) groups.push({ part: null, works: unassigned })
+  return groups
+}

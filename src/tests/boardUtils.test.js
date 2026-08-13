@@ -1,5 +1,6 @@
 import {
   daysUntil, dDayLabel, tasksProgress, nextSortOrder, swapPlan, nearestDue, filterVolumeWorks,
+  partLabel, nextPartNumber, groupByPart,
 } from '../board/boardUtils.js'
 import { TASK_PRESETS, SELECTION_LABELS } from '../board/constants.js'
 
@@ -71,4 +72,34 @@ test('TASK_PRESETS: 10종, 라벨 존재', () => {
   expect(TASK_PRESETS[0]).toHaveProperty('type')
   expect(TASK_PRESETS[0]).toHaveProperty('label')
   expect(SELECTION_LABELS.confirmed).toBe('확정')
+})
+
+test('partLabel: 제목 유무에 따라', () => {
+  expect(partLabel({ number: 1, title: null })).toBe('1부')
+  expect(partLabel({ number: 2, title: '현대시' })).toBe('2부 현대시')
+})
+
+test('nextPartNumber', () => {
+  expect(nextPartNumber([])).toBe(1)
+  expect(nextPartNumber([{ number: 1 }, { number: 3 }])).toBe(4)
+})
+
+test('groupByPart: 부 없으면 단일 그룹, 있으면 부별+미배정', () => {
+  const works = [
+    { id: 'a', part_id: 'p1' }, { id: 'b', part_id: null }, { id: 'c', part_id: 'p1' },
+  ]
+  expect(groupByPart(works, [])).toEqual([{ part: null, works }])
+  const p1 = { id: 'p1', number: 1, title: null }
+  const p2 = { id: 'p2', number: 2, title: null }
+  const groups = groupByPart(works, [p1, p2])
+  expect(groups).toHaveLength(3) // 1부, 2부(빈 그룹 유지), 미배정
+  expect(groups[0].works.map(w => w.id)).toEqual(['a', 'c'])
+  expect(groups[1].works).toEqual([])
+  expect(groups[2].part).toBeNull()
+  expect(groups[2].works.map(w => w.id)).toEqual(['b'])
+})
+
+test('groupByPart: 미배정 작품이 없으면 미배정 그룹 생략', () => {
+  const groups = groupByPart([{ id: 'a', part_id: 'p1' }], [{ id: 'p1', number: 1 }])
+  expect(groups).toHaveLength(1)
 })
