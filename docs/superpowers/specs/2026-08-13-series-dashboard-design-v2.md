@@ -129,7 +129,7 @@ v1과 동일: number, title(주제명), status(기획/선정중/확정/제작중
 | work_snapshot | 추가 시점의 작품 정보 jsonb `{title, author, genre, curriculum}` |
 | sort_order | 수록 순서 (간격 있는 정수, 예: 10, 20, 30 — 사이 삽입 여지) |
 | selection_status | `candidate`(후보) / `hold`(보류) / `confirmed`(확정) / `excluded`(제외) |
-| production_status | `not_started`(미착수) / `in_progress`(진행 중) / `review`(검토 중) / `completed`(완료). 기본값 `not_started` |
+| production_status | **(2026-08-13 사용자 결정으로 UI에서 제거 — 2c단계)** 편집 공정까지 기록하는 것은 과함. 진행 확인은 업무 진행률(n/m)로 충분. DB 컬럼은 보존(데이터 위험 회피, 복원 여지) |
 | note | 선정 메모 |
 | created_by, updated_by, created_at, updated_at | 이력 |
 
@@ -143,7 +143,7 @@ v1과 동일: number, title(주제명), status(기획/선정중/확정/제작중
 |---|---|
 | id | uuid PK |
 | volume_work_id | volume_works FK (ON DELETE CASCADE) |
-| task_type | 프리셋 키 또는 `custom`. 프리셋: 본문 확보, 저작권 확인, 원고 작성, 해제 작성, 부가 원고, 이미지 확보, 편집 검토, 조판, 교정, 최종 확인 — **코드의 상수 배열**로만 정의해 추가·변경이 쉽게 |
+| task_type | 프리셋 키 또는 `custom`. 프리셋(2c에서 6종으로 축소 — 편집 공정 제외): 본문 확보, 저작권 확인, 원고 집필, 해제 작성, 부가 원고, 이미지 확보 — **코드의 상수 배열**로만 정의해 추가·변경이 쉽게. 그 외 업무는 직접 입력 |
 | title | 표시명 (프리셋 선택 시 자동 채움, 수정 가능) |
 | assignee_id | members FK, nullable |
 | due_date | date, nullable |
@@ -153,6 +153,18 @@ v1과 동일: number, title(주제명), status(기획/선정중/확정/제작중
 
 - 작품마다 필요한 업무만 추가·삭제한다. 프리셋은 "자주 쓰는 것 빠른 추가" 편의일 뿐 강제가 아니다.
 - "확정 시 업무 자동 생성" 같은 템플릿 일괄 생성은 MVP에서 하지 않는다. 다만 프리셋 다중 선택 추가(체크박스로 여러 개 한 번에)는 클릭 수 절약을 위해 제공한다.
+
+### work_comments (검토 의견) — 2c단계 추가
+
+| 컬럼 | 설명 |
+|---|---|
+| id | uuid PK |
+| volume_work_id | volume_works FK (ON DELETE CASCADE) |
+| body | 의견 본문 |
+| created_by, created_at | 작성자·시각 (트리거 자동 기록, set_registry_created_by 재사용) |
+
+- 작품 단위로 위원·편집자가 검토 의견을 남긴다 (선정 논의·우려·제안). 수정 없음, 삭제만 가능(전원 편집 원칙). 자유 채팅이 아니라 작품에 붙는 기록.
+- RLS 동일 원칙. activity_log 트리거는 붙이지 않는다(의견 자체가 기록).
 
 ### schedules, files
 
@@ -183,7 +195,8 @@ v1 구조 유지 (table_name, record_id, action, diff, actor_id, created_at). �
 - 행 클릭 → **오른쪽 상세 패널** (화면 이동 없음):
   - 작품 정보: 작품명, 작가, 갈래, 교육과정, 다른 권 수록 여부(work_id 기준, **후보/확정 상태 포함** — 권 간 중복 선정은 허용하고 확정 판단 재료로 표시), 저작권 뱃지(4단계에서)
   - 선정: selection_status 변경, 선정 메모
-  - 제작: production_status 변경, 진행률, 업무 체크리스트(체크 = done 토글, 담당자·마감일 인라인 편집, 추가·삭제)
+  - 업무: 진행률(n/m), 업무 체크리스트(체크 = done 토글, 담당자·마감일 인라인 편집, 추가·삭제) — 제작 상태 select와 "완료로 변경" 제안은 2c에서 제거됨
+  - 검토 의견: 의견 목록(작성자·시각) + 남기기 + 삭제 (2c단계)
   - 자료: **해제 원고 업로드/링크 첨부 + 업로드 여부 표시** (3단계 — files.volume_work_id 사용, 확정 작품의 필수 산출물 추적). 그 외 권별 자료실은 5단계
   - 이력: 이 작품의 최근 activity_log 5건
 - 목표 흐름의 클릭 수: 권 선택(1) → 작품 행 클릭(1) → 패널에서 담당자/마감 인라인 수정(1~2) → 체크 완료(1). 저장 버튼 없이 즉시 저장 + 실패 시 토스트·롤백.
@@ -295,6 +308,7 @@ v1 유지 + 추가:
 | 1 | 프로젝트 세팅(Vite/React/Tailwind/Vitest), Supabase 프로젝트 생성 + 스키마·트리거·RLS SQL, 커스텀 SMTP, 매직 링크 로그인 + 첫 로그인 연결, 배포 파이프라인(keep-alive 포함) |
 | 2 | 권 관리 + 권별 작품 목록(검색 이식, 추가/선정/순서) + works_registry + 상세 패널 + work_tasks + Realtime |
 | 2b | 부(volume_parts) 관리 + 부별 그룹 표시 + 부 선택 후 추가·작품 부 지정 + **권 수정·삭제**(번호·주제명 수정, 삭제는 확인 후 수록·업무 연쇄 삭제 — 스키마의 on delete cascade로 처리, 이력 잔존) (스키마는 2단계 SQL에 포함) |
+| 2c | **단순화 + 검토 의견** (2026-08-13 사용자 결정): 제작 상태 UI 제거(배지·select·완료 제안·목록 필터의 제작 상태), 권 상태에서 '제작중' 옵션 제거(DB check는 보존), 프리셋 6종 축소, work_comments 테이블 + 패널 검토 의견 섹션 |
 | 3 | 홈(내 할 일, 주의 필요, 마감, 권별 현황, 활동 피드) + 작품 해제 원고 업로드·업로드 여부 표시 (Storage 버킷 이 단계에서 생성) |
 | 4 | 일정, 연락처(초대 운영 절차 문서 포함) |
 | 5 | 자료실(업로드+링크), 엑셀 내보내기, 저작권 뱃지, (선택) literature-db 수록 현황 페이지 |
