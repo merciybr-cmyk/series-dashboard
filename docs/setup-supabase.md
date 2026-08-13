@@ -22,7 +22,7 @@
      - `http://localhost:5173`
      - `http://localhost:5173/**`
      - `https://merciybr-cmyk.github.io/series-dashboard/**`
-
+e
 ## 4. Gmail SMTP (설계 §6.2 — 필수)
 1. Google 계정 → 보안 → 2단계 인증 켜기 → 앱 비밀번호 생성 (이름: supabase)
 2. Supabase → 왼쪽 사이드바 Authentication → Emails → **SMTP Settings 탭** → Enable Custom SMTP 켜기

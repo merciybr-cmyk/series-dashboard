@@ -1526,7 +1526,7 @@ git commit -m "feat: 권 목록 페이지 (새 권 추가 포함)"
     - `duplicatesByKey`: `Map<workKey, [{volumeNumber, selection_status}]>` — 부모(Task 10)가 registry+listAllVolumeWorks로 계산
     - `onAdd(representativeWork, curricula)`: 추가 버튼 클릭 시 호출. representativeWork는 그 작품의 첫 시트 행
     - 검색 결과는 **작품 단위로 중복 제거**(workKeyOf 기준)해 최대 50개 표시 + 총 건수 표시
-    - 이미 수록된 권이 있으면 "2권 수록" 뱃지 표시
+    - 이미 수록된 권이 있으면 **선정 상태를 포함한 뱃지** 표시: "2권 후보", "4권 확정" — 권 간 중복 선정은 허용하며, 확정 판단 재료로 보여주는 것 (설계 §5.1)
 
 - [ ] **Step 1: 실패하는 테스트 작성** — `src/tests/SearchPane.test.jsx`
 
@@ -1563,10 +1563,14 @@ test('검색어로 거른다', async () => {
   expect(screen.getByText('별 헤는 밤')).toBeInTheDocument()
 })
 
-test('이미 수록된 작품에는 권 뱃지를 단다', () => {
-  const dup = new Map([[workKeyOf(WORKS[0]), [{ volumeNumber: 2, selection_status: 'confirmed' }]]])
+test('이미 수록된 작품에는 선정 상태를 포함한 권 뱃지를 단다', () => {
+  const dup = new Map([[workKeyOf(WORKS[0]), [
+    { volumeNumber: 2, selection_status: 'confirmed' },
+    { volumeNumber: 4, selection_status: 'candidate' },
+  ]]])
   render(<SearchPane works={WORKS} duplicatesByKey={dup} onAdd={() => {}} />)
-  expect(screen.getByText('2권 수록')).toBeInTheDocument()
+  expect(screen.getByText('2권 확정')).toBeInTheDocument()
+  expect(screen.getByText('4권 후보')).toBeInTheDocument()
 })
 ```
 
@@ -1634,6 +1638,7 @@ export default function MultiSelectDropdown({ label, options, selected, onChange
 import { useMemo, useState } from 'react'
 import { filterWorks, getUniqueValues } from '../works/filterWorks.js'
 import { workKeyOf, curriculaOf } from '../works/workKey.js'
+import { SELECTION_LABELS } from './constants.js'
 import MultiSelectDropdown from './MultiSelectDropdown.jsx'
 
 const MAX_SHOWN = 50
@@ -1684,8 +1689,11 @@ export default function SearchPane({ works, duplicatesByKey, onAdd }) {
                 </div>
               </div>
               {dups.map(d => (
-                <span key={d.volumeNumber} className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
-                  {d.volumeNumber}권 수록
+                <span
+                  key={d.volumeNumber}
+                  className={`shrink-0 rounded px-1.5 py-0.5 text-xs ${d.selection_status === 'confirmed' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}
+                >
+                  {d.volumeNumber}권 {SELECTION_LABELS[d.selection_status]}
                 </span>
               ))}
               <button
