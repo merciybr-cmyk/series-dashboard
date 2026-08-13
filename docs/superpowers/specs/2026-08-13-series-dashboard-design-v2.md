@@ -103,12 +103,28 @@ works_registry
 
 v1과 동일: number, title(주제명), status(기획/선정중/확정/제작중/완료), editor_id, note.
 
+### volume_parts (부) — 권 하위 구성, 선택적
+
+| 컬럼 | 설명 |
+|---|---|
+| id | uuid PK |
+| volume_id | volumes FK (권 삭제 시 함께 삭제) |
+| number | 부 번호 (권 내 unique) |
+| title | 부 제목. **nullable — 확정 전에는 비워두고 "N부"로 표시**, 확정되면 입력 |
+| sort_order | 표시 순서 |
+| created_by, updated_by, created_at, updated_at | 이력 |
+
+- 부 구성은 선택적이다: 부가 없는 권은 단일 목록으로 동작한다. 통상 권당 3부 내외 예상.
+- 갈래별 구성과 주제별 구성은 스키마 구분 없이 부 제목으로 표현한다 (예: "현대시/소설/수필" 또는 "만남/성장/이별").
+- 부 삭제 시 소속 작품은 삭제되지 않고 미배정으로 돌아간다 (part_id → null).
+
 ### volume_works (권별 수록 작품)
 
 | 컬럼 | 설명 |
 |---|---|
 | id | uuid PK |
 | volume_id | volumes FK |
+| part_id | volume_parts FK, **nullable** (미배정 허용, 부 삭제 시 set null) |
 | work_id | works_registry FK. **NOT NULL** — work_id 없이는 등록 불가 |
 | work_snapshot | 추가 시점의 작품 정보 jsonb `{title, author, genre, curriculum}` |
 | sort_order | 수록 순서 (간격 있는 정수, 예: 10, 20, 30 — 사이 삽입 여지) |
@@ -155,7 +171,7 @@ v1 구조 유지 (table_name, record_id, action, diff, actor_id, created_at). �
 ### 5.1 권별 작품 목록 (핵심 화면)
 
 - 좌: 작품 검색 (literature-db의 검색어·초성·교육과정·갈래 필터 이식). 검색 결과 행에는 work_id 매칭 기반 "N권 수록/후보" 뱃지 표시.
-- 우: 선택한 권의 수록 목록. 행 구성:
+- 우: 선택한 권의 수록 목록. **부(volume_parts)가 있으면 부별 그룹 + "미배정" 그룹으로 표시**, 없으면 단일 목록. 권 헤더에서 부 추가·이름 변경·삭제, 상세 패널에서 작품의 부 지정. 행 구성:
 
 ```
 소나기 / 황순원          [확정] [진행 중]  ▓▓▓░░ 4/8   담당 김○○ · D-3
@@ -278,6 +294,7 @@ v1 유지 + 추가:
 | 0 | 본 설계 문서 확정 |
 | 1 | 프로젝트 세팅(Vite/React/Tailwind/Vitest), Supabase 프로젝트 생성 + 스키마·트리거·RLS SQL, 커스텀 SMTP, 매직 링크 로그인 + 첫 로그인 연결, 배포 파이프라인(keep-alive 포함) |
 | 2 | 권 관리 + 권별 작품 목록(검색 이식, 추가/선정/순서) + works_registry + 상세 패널 + work_tasks + Realtime |
+| 2b | 부(volume_parts) 관리 + 부별 그룹 표시 + 작품 부 지정 (스키마는 2단계 SQL에 포함) |
 | 3 | 홈(내 할 일, 주의 필요, 마감, 권별 현황, 활동 피드) + 작품 해제 원고 업로드·업로드 여부 표시 (Storage 버킷 이 단계에서 생성) |
 | 4 | 일정, 연락처(초대 운영 절차 문서 포함) |
 | 5 | 자료실(업로드+링크), 엑셀 내보내기, 저작권 뱃지, (선택) literature-db 수록 현황 페이지 |
