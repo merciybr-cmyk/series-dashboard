@@ -91,8 +91,9 @@ works_registry
 
 | 컬럼 | 설명 |
 |---|---|
-| id | uuid PK. auth.users.id와 동일 (첫 로그인 시 연결 — 6.1) |
-| email | 초대 이메일 (연결 전 매칭 키, unique) |
+| id | uuid PK (자체 발급). 업무 배정 등 모든 FK는 이 id를 참조 — 로그인 전 구성원에게도 배정 가능해야 하므로 auth ID와 분리 |
+| auth_user_id | uuid unique nullable. 첫 로그인 시 이메일 매칭으로 연결 — 6.1 |
+| email | 초대 이메일 (연결 전 매칭 키, unique, 소문자 저장) |
 | name, affiliation | 이름, 소속 |
 | role | `editor` / `committee` (표시용. 권한 차등 없음) |
 | assigned_volumes | 담당 권 번호 배열 (표시·기본 필터용. 편집 제한 없음) |
@@ -213,7 +214,7 @@ v1은 "편집부가 대시보드에서 이메일 초대"라고 썼으나, **사�
 
 - **초대는 Supabase Studio에서 수동으로 한다** (편집부 관리자 1명이 Authentication → Invite user). 연 몇 회 발생하는 작업이라 충분하다.
 - 초대와 함께 members 행을 등록한다 (대시보드의 연락처 화면에서 이메일 포함 정보 입력 — 이건 일반 테이블 쓰기라 앱에서 가능).
-- 첫 로그인 시 트리거가 `auth.users.email = members.email`인 행에 `members.id = auth.uid()`를 연결한다. 이렇게 하면 **로그인 전 구성원에게도 업무 배정 가능** (완료 기준 6 충족).
+- 첫 로그인 시 트리거가 `auth.users.email = members.email`인 행에 `members.auth_user_id = auth.uid()`를 연결한다. 이렇게 하면 **로그인 전 구성원에게도 업무 배정 가능** (완료 기준 6 충족).
 - 미초대 이메일: `signInWithOtp`에 `shouldCreateUser: false`를 사용해 초대된 계정만 로그인 가능.
 
 **별도 관리자 페이지는 만들지 않는다.** 전원 동일 권한이므로 앱 안에서 관리자만 쓰는 화면이 없다 — 권 생성·구성원 명부·업무 관리 전부 일반 화면에서 전원이 할 수 있다. 앱 밖 관리 작업(구성원 초대, 잘못된 데이터의 직접 수정·복구, 백업)은 편집부 관리자 1명이 Supabase Studio(웹 관리 콘솔, 무료 제공)에서 수행하며, 이 절차는 4단계에서 운영 문서로 정리한다.
