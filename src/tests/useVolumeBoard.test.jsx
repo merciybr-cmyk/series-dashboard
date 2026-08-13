@@ -12,6 +12,9 @@ vi.mock('../board/volumeApi.js', () => ({
   addTasks: vi.fn(),
   updateTask: vi.fn(),
   deleteTask: vi.fn(),
+  createPart: vi.fn(),
+  updatePart: vi.fn(),
+  deletePart: vi.fn(),
 }))
 const api = await import('../board/volumeApi.js')
 const { useVolumeBoard } = await import('../board/useVolumeBoard.js')
@@ -28,15 +31,18 @@ const BOARD = {
   volume: { id: 'v1', number: 3, title: '성장' },
   works: [{ id: 'vw1', volume_id: 'v1', work_id: 'W000001', sort_order: 10, selection_status: 'candidate', production_status: 'not_started', work_snapshot: { title: '소나기', author: '황순원' } }],
   tasks: [{ id: 't1', volume_work_id: 'vw1', status: 'todo', title: '해제 작성' }],
+  parts: [],
 }
 
 function Probe() {
-  const { volume, works, tasksByVw, loading, actions } = useVolumeBoard('v1')
+  const { volume, works, tasksByVw, parts, loading, actions } = useVolumeBoard('v1')
   if (loading) return <div>로딩</div>
   return (
     <div>
-      <div>권:{volume.number} 작품수:{works.length} vw1업무:{(tasksByVw.vw1 || []).length}</div>
+      <div>권:{volume.number} 작품수:{works.length} vw1업무:{(tasksByVw.vw1 || []).length} 부:{parts.length}</div>
       <button onClick={() => actions.setTask('t1', { status: 'done' })}>완료</button>
+      <button onClick={() => actions.addPart()}>부추가</button>
+      <button onClick={() => actions.removePart('p1')}>부삭제</button>
     </div>
   )
 }
@@ -48,7 +54,7 @@ function renderProbe() {
 test('보드를 로드해 works/tasksByVw를 제공한다', async () => {
   api.getBoard.mockResolvedValue(BOARD)
   renderProbe()
-  await waitFor(() => expect(screen.getByText('권:3 작품수:1 vw1업무:1')).toBeInTheDocument())
+  await waitFor(() => expect(screen.getByText('권:3 작품수:1 vw1업무:1 부:0')).toBeInTheDocument())
 })
 
 test('setTask 성공 시 로컬 상태를 패치한다', async () => {
@@ -80,6 +86,30 @@ test('Realtime 이벤트가 오면 다시 로드한다', async () => {
   await act(async () => { await vi.advanceTimersByTimeAsync(400) })
   expect(api.getBoard).toHaveBeenCalledTimes(2)
   vi.useRealTimers()
+})
+
+test('addPart: 다음 번호로 생성해 parts에 반영한다', async () => {
+  api.getBoard.mockResolvedValue({ ...BOARD, parts: [{ id: 'p1', number: 1, title: null }] })
+  api.createPart.mockResolvedValue({ id: 'p2', number: 2, title: null })
+  renderProbe()
+  await waitFor(() => screen.getByText(/부:1/))
+  await act(() => screen.getByText('부추가').click())
+  expect(api.createPart).toHaveBeenCalledWith('v1', 2)
+  await waitFor(() => expect(screen.getByText(/부:2/)).toBeInTheDocument())
+})
+
+test('removePart: 부 삭제 시 소속 작품이 미배정으로 패치된다', async () => {
+  api.getBoard.mockResolvedValue({
+    ...BOARD,
+    parts: [{ id: 'p1', number: 1, title: null }],
+    works: [{ ...BOARD.works[0], part_id: 'p1' }],
+  })
+  api.deletePart.mockResolvedValue()
+  renderProbe()
+  await waitFor(() => screen.getByText(/부:1/))
+  await act(() => screen.getByText('부삭제').click())
+  expect(api.deletePart).toHaveBeenCalledWith('p1')
+  await waitFor(() => expect(screen.getByText(/부:0/)).toBeInTheDocument())
 })
 
 function ProbeWithError() {

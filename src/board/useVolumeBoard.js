@@ -2,12 +2,13 @@
 // 원칙: 액션은 서버 성공 응답으로 로컬 패치, 실패는 토스트 + 전체 재조회(롤백).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './volumeApi.js'
-import { nextSortOrder, swapPlan } from './boardUtils.js'
+import { nextSortOrder, swapPlan, nextPartNumber } from './boardUtils.js'
 import { useToast } from '../components/Toast.jsx'
 
 export function useVolumeBoard(volumeId) {
   const [volume, setVolume] = useState(null)
   const [works, setWorks] = useState([])
+  const [parts, setParts] = useState([])
   const [tasks, setTasks] = useState([])
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -20,6 +21,7 @@ export function useVolumeBoard(volumeId) {
     try {
       const board = await api.getBoard(volumeId)
       setVolume(board.volume)
+      setParts(board.parts)
       setWorks(board.works)
       setTasks(board.tasks)
       setError(null)
@@ -69,9 +71,9 @@ export function useVolumeBoard(volumeId) {
   const actions = useMemo(() => ({
     reload,
 
-    addWork: (work, curricula, registryMap) => guard(async () => {
+    addWork: (work, curricula, registryMap, partId) => guard(async () => {
       const row = await api.addWorkToVolume({
-        volumeId, work, curricula, registryMap, sortOrder: nextSortOrder(works),
+        volumeId, work, curricula, registryMap, sortOrder: nextSortOrder(works), partId,
       })
       setWorks(ws => [...ws, row])
       return row
@@ -116,7 +118,25 @@ export function useVolumeBoard(volumeId) {
       await api.deleteTask(id)
       setTasks(ts => ts.filter(t => t.id !== id))
     }),
-  }), [guard, reload, volumeId, works])
 
-  return { volume, works, tasksByVw, members, loading, error, actions }
+    addPart: () => guard(async () => {
+      const part = await api.createPart(volumeId, nextPartNumber(parts))
+      setParts(ps => [...ps, part].sort((a, b) => a.number - b.number))
+      return part
+    }),
+
+    renamePart: (id, title) => guard(async () => {
+      const part = await api.updatePart(id, { title: title.trim() || null })
+      setParts(ps => ps.map(p => (p.id === id ? part : p)))
+      return part
+    }),
+
+    removePart: id => guard(async () => {
+      await api.deletePart(id)
+      setParts(ps => ps.filter(p => p.id !== id))
+      setWorks(ws => ws.map(w => (w.part_id === id ? { ...w, part_id: null } : w)))
+    }),
+  }), [guard, reload, volumeId, works, parts])
+
+  return { volume, works, parts, tasksByVw, members, loading, error, actions }
 }
