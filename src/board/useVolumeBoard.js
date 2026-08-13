@@ -92,7 +92,10 @@ export function useVolumeBoard(volumeId) {
     }),
 
     move: (id, dir) => guard(async () => {
-      const pairs = swapPlan(works, id, dir)
+      const target = works.find(w => w.id === id)
+      if (!target) return
+      const bucket = works.filter(w => w.part_id === target.part_id)
+      const pairs = swapPlan(bucket, id, dir)
       if (!pairs) return
       await api.applySortSwap(pairs)
       setWorks(ws => {
@@ -120,7 +123,13 @@ export function useVolumeBoard(volumeId) {
     }),
 
     addPart: () => guard(async () => {
-      const part = await api.createPart(volumeId, nextPartNumber(parts))
+      let part
+      try {
+        part = await api.createPart(volumeId, nextPartNumber(parts))
+      } catch (err) {
+        if (/23505|duplicate/i.test(err.message)) throw new Error('부 추가가 겹쳤습니다. 잠시 후 다시 시도해 주세요.')
+        throw err
+      }
       setParts(ps => [...ps, part].sort((a, b) => a.number - b.number))
       return part
     }),

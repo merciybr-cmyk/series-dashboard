@@ -43,6 +43,7 @@ function Probe() {
       <button onClick={() => actions.setTask('t1', { status: 'done' })}>완료</button>
       <button onClick={() => actions.addPart()}>부추가</button>
       <button onClick={() => actions.removePart('p1')}>부삭제</button>
+      <button onClick={() => actions.move('w-c', 'up')}>이동</button>
     </div>
   )
 }
@@ -110,6 +111,27 @@ test('removePart: 부 삭제 시 소속 작품이 미배정으로 패치된다',
   await act(() => screen.getByText('부삭제').click())
   expect(api.deletePart).toHaveBeenCalledWith('p1')
   await waitFor(() => expect(screen.getByText(/부:0/)).toBeInTheDocument())
+})
+
+test('move: 부 그룹 내에서만 이웃과 교환한다(전체 배열 이웃이 아니라)', async () => {
+  api.getBoard.mockResolvedValue({
+    ...BOARD,
+    parts: [{ id: 'p1', number: 1, title: null }, { id: 'p2', number: 2, title: null }],
+    works: [
+      { ...BOARD.works[0], id: 'w-a', part_id: 'p1', sort_order: 10 },
+      { ...BOARD.works[0], id: 'w-b', part_id: 'p2', sort_order: 20 },
+      { ...BOARD.works[0], id: 'w-c', part_id: 'p1', sort_order: 30 },
+    ],
+  })
+  api.applySortSwap.mockResolvedValue()
+  renderProbe()
+  await waitFor(() => screen.getByText('이동'))
+  await act(() => screen.getByText('이동').click())
+  // w-c(부 p1)의 '위' 이웃은 전체 배열상 w-b(부 p2)가 아니라 같은 부의 w-a여야 한다.
+  expect(api.applySortSwap).toHaveBeenCalledWith([
+    { id: 'w-c', sort_order: 10 },
+    { id: 'w-a', sort_order: 30 },
+  ])
 })
 
 function ProbeWithError() {
