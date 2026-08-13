@@ -1,0 +1,145 @@
+// 권 보드의 모든 Supabase 호출. UI는 이 모듈만 통해 서버와 대화한다.
+import { supabase } from '../lib/supabaseClient'
+import { keyOf, snapshotOf } from '../works/workKey.js'
+
+function unwrap({ data, error }) {
+  if (error) throw new Error(error.message)
+  return data
+}
+
+// ---------- volumes ----------
+
+export async function listVolumes() {
+  return unwrap(await supabase.from('volumes').select('*').order('number'))
+}
+
+export async function createVolume({ number, title }) {
+  return unwrap(await supabase.from('volumes').insert({ number, title }).select().single())
+}
+
+export async function updateVolume(id, patch) {
+  return unwrap(await supabase.from('volumes').update(patch).eq('id', id).select().single())
+}
+
+// ---------- 보드 로드 ----------
+
+export async function getBoard(volumeId) {
+  const volume = unwrap(await supabase.from('volumes').select('*').eq('id', volumeId).single())
+  const works = unwrap(
+    await supabase.from('volume_works').select('*').eq('volume_id', volumeId).order('sort_order'),
+  )
+  const ids = works.map(w => w.id)
+  const tasks = ids.length
+    ? unwrap(await supabase.from('work_tasks').select('*').in('volume_work_id', ids).order('sort_order'))
+    : []
+  return { volume, works, tasks }
+}
+
+// 중복 수록 뱃지용: 전체 권의 수록 현황 (권 번호 포함)
+export async function listAllVolumeWorks() {
+  return unwrap(
+    await supabase.from('volume_works')
+      .select('id, volume_id, work_id, selection_status, volumes(number, title)'),
+  )
+}
+
+// ---------- works_registry ----------
+
+export async function listRegistry() {
+  return unwrap(await supabase.from('works_registry').select('*'))
+}
+
+// 맵에서 찾으면 기존 ID. 없으면 insert — 동시 등록 경합(23505)이면 재조회.
+export async function ensureWorkId(work, curricula, registryMap) {
+  const existing = registryMap.get(keyOf(work['작품명'], work._authorBase))
+  if (existing) return existing
+
+  const row = {
+    title: work['작품명'],
+    author_base: work._authorBase,
+    snapshot: snapshotOf(work, curricula),
+  }
+  const { data, error } = await supabase.from('works_registry').insert(row).select('work_id').single()
+  if (!error) return data.work_id
+  if (error.code === '23505') {
+    const again = unwrap(
+      await supabase.from('works_registry').select('work_id')
+        .eq('title', row.title).eq('author_base', row.author_base).single(),
+    )
+    return again.work_id
+  }
+  throw new Error(error.message)
+}
+
+// ---------- volume_works ----------
+
+export async function addWorkToVolume({ volumeId, work, curricula, registryMap, sortOrder }) {
+  const workId = await ensureWorkId(work, curricula, registryMap)
+  const { data, error } = await supabase.from('volume_works').insert({
+    volume_id: volumeId,
+    work_id: workId,
+    work_snapshot: snapshotOf(work, curricula),
+    sort_order: sortOrder,
+  }).select().single()
+  if (error) {
+    if (error.code === '23505') throw new Error('이미 이 권에 있는 작품입니다')
+    throw new Error(error.message)
+  }
+  return data
+}
+
+export async function updateVolumeWork(id, patch) {
+  return unwrap(await supabase.from('volume_works').update(patch).eq('id', id).select().single())
+}
+
+export async function deleteVolumeWork(id) {
+  unwrap(await supabase.from('volume_works').delete().eq('id', id))
+}
+
+export async function applySortSwap(pairs) {
+  for (const { id, sort_order } of pairs) {
+    unwrap(await supabase.from('volume_works').update({ sort_order }).eq('id', id).select().single())
+  }
+}
+
+// ---------- work_tasks ----------
+
+export async function addTasks(volumeWorkId, items) {
+  return unwrap(
+    await supabase.from('work_tasks')
+      .insert(items.map(it => ({ ...it, volume_work_id: volumeWorkId })))
+      .select(),
+  )
+}
+
+export async function updateTask(id, patch) {
+  return unwrap(await supabase.from('work_tasks').update(patch).eq('id', id).select().single())
+}
+
+export async function deleteTask(id) {
+  unwrap(await supabase.from('work_tasks').delete().eq('id', id))
+}
+
+// ---------- 기타 ----------
+
+export async function listMembers() {
+  return unwrap(await supabase.from('members').select('id, name, role, affiliation').order('name'))
+}
+
+export async function listActivityFor(recordIds) {
+  if (!recordIds.length) return []
+  return unwrap(
+    await supabase.from('activity_log').select('*')
+      .in('record_id', recordIds).order('id', { ascending: false }).limit(5),
+  )
+}
+
+// ---------- Realtime (설계 §7) ----------
+
+export function subscribeBoard(onChange) {
+  const ch = supabase.channel('board-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'volume_works' }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'work_tasks' }, onChange)
+    .subscribe()
+  return () => supabase.removeChannel(ch)
+}
