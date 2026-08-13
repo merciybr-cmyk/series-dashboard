@@ -6,6 +6,8 @@ import { vi } from 'vitest'
 vi.mock('../board/volumeApi.js', () => ({
   listVolumes: vi.fn(),
   createVolume: vi.fn(),
+  updateVolume: vi.fn(),
+  deleteVolume: vi.fn(),
 }))
 const api = await import('../board/volumeApi.js')
 const { default: VolumesPage } = await import('../board/VolumesPage.jsx')
@@ -36,4 +38,31 @@ test('새 권을 추가하면 목록에 나타난다', async () => {
   await userEvent.click(screen.getByRole('button', { name: '새 권 추가' }))
   expect(api.createVolume).toHaveBeenCalledWith({ number: 9, title: '자연' })
   await waitFor(() => expect(screen.getByText('자연')).toBeInTheDocument())
+})
+
+test('권을 인라인으로 수정한다', async () => {
+  api.listVolumes.mockResolvedValue([{ id: 'v1', number: 1, title: '가족', status: '기획' }])
+  api.updateVolume.mockResolvedValue({ id: 'v1', number: 1, title: '다양한 삶의 모습', status: '기획' })
+  renderPage()
+  await waitFor(() => screen.getByText('가족'))
+  await userEvent.click(screen.getByRole('button', { name: '수정' }))
+  const titleInput = screen.getByLabelText('주제명 수정')
+  await userEvent.clear(titleInput)
+  await userEvent.type(titleInput, '다양한 삶의 모습')
+  await userEvent.click(screen.getByRole('button', { name: '저장' }))
+  expect(api.updateVolume).toHaveBeenCalledWith('v1', { number: 1, title: '다양한 삶의 모습' })
+  await waitFor(() => expect(screen.getByText('다양한 삶의 모습')).toBeInTheDocument())
+})
+
+test('권 삭제는 확인 후 목록에서 제거한다', async () => {
+  api.listVolumes.mockResolvedValue([{ id: 'v1', number: 1, title: '가족', status: '기획' }])
+  api.deleteVolume.mockResolvedValue()
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
+  renderPage()
+  await waitFor(() => screen.getByText('가족'))
+  await userEvent.click(screen.getByRole('button', { name: '삭제' }))
+  expect(window.confirm).toHaveBeenCalled()
+  expect(api.deleteVolume).toHaveBeenCalledWith('v1')
+  await waitFor(() => expect(screen.queryByText('가족')).not.toBeInTheDocument())
+  window.confirm.mockRestore()
 })
