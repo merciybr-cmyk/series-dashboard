@@ -4,7 +4,7 @@ on:
   push:
     branches: [master]
   schedule:
-    - cron: '0 0 * * 1' # 매주 월 00:00 UTC — Supabase 무료 플랜 일시정지 방지
+    - cron: '0 0 * * 1,4' # 매주 월·목 00:00 UTC — Supabase 무료 플랜 일시정지 방지 (주 2회: 1회가 장애와 겹쳐도 7일 공백이 안 생김)
   workflow_dispatch:
 
 permissions:
@@ -23,7 +23,9 @@ jobs:
     steps:
       - name: Supabase keep-alive 요청
         run: |
-          curl -fsS "${{ secrets.VITE_SUPABASE_URL }}/rest/v1/volumes?select=id&limit=1" \
+          # 일시 장애에 견디도록 재시도: 총 6회, 5분 간격 (2026-08-24 장애로 핑 실패→프로젝트 일시정지 재발 방지)
+          curl -fsS --retry 5 --retry-delay 300 --retry-all-errors \
+            "${{ secrets.VITE_SUPABASE_URL }}/rest/v1/volumes?select=id&limit=1" \
             -H "apikey: ${{ secrets.VITE_SUPABASE_ANON_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.VITE_SUPABASE_ANON_KEY }}" \
             -o /dev/null
