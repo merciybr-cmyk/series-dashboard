@@ -1,6 +1,6 @@
 // 작품 상세 패널 (설계 §5.1): 정보 / 선정 / 제작(업무 체크리스트) / 이력
 import { useEffect, useMemo, useState } from 'react'
-import { SELECTION_LABELS, PRODUCTION_LABELS, TASK_PRESETS } from './constants.js'
+import { SELECTION_LABELS, TASK_PRESETS } from './constants.js'
 import { tasksProgress, daysUntil, dDayLabel, partLabel } from './boardUtils.js'
 import { listActivityFor } from './volumeApi.js'
 
@@ -27,7 +27,6 @@ export default function WorkDetailPanel({ volumeWork: vw, tasks, members, duplic
   }, [vw.id, vw.updated_at, tasks])
 
   const { done, total } = tasksProgress(tasks)
-  const allDone = total > 0 && done === total
   const snap = vw.work_snapshot
 
   const nextOrder = useMemo(() => (tasks.length ? Math.max(...tasks.map(t => t.sort_order ?? 0)) + 10 : 10), [tasks])
@@ -100,26 +99,8 @@ export default function WorkDetailPanel({ volumeWork: vw, tasks, members, duplic
         />
       </Section>
 
-      <Section title={`제작 진행 ${total ? `(${done}/${total})` : ''}`}>
+      <Section title={`업무 ${total ? `(${done}/${total})` : ''}`}>
         <div className={vw.selection_status === 'excluded' ? 'opacity-40' : ''}>
-        <div className="mb-2 flex items-center gap-2">
-          <label className="text-sm" htmlFor="prod-status">제작 상태</label>
-          <select id="prod-status" value={vw.production_status}
-            onChange={e => actions.setVolumeWork(vw.id, { production_status: e.target.value })}
-            className="rounded border border-gray-300 px-2 py-1 text-sm">
-            {Object.entries(PRODUCTION_LABELS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-          </select>
-          {total > 0 && <span className="text-sm text-gray-500">{done}/{total}</span>}
-        </div>
-
-        {allDone && vw.production_status !== 'completed' && (
-          <div className="mb-2 flex items-center gap-2 rounded bg-blue-50 px-2 py-1.5 text-xs text-blue-800">
-            모든 업무가 완료되었습니다.
-            <button type="button" onClick={() => actions.setVolumeWork(vw.id, { production_status: 'completed' })}
-              className="rounded bg-blue-600 px-2 py-0.5 font-medium text-white">완료로 변경</button>
-          </div>
-        )}
-
         <ul className="space-y-1">
           {tasks.map(t => (
             <li key={t.id} className="flex items-center gap-2 text-sm">

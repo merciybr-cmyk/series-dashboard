@@ -1,6 +1,6 @@
 // 우측 수록 목록: 배지·진행률·마감 요약 + 필터 바 + 순서 이동
 import { useMemo, useState } from 'react'
-import { SELECTION_LABELS, PRODUCTION_LABELS } from './constants.js'
+import { SELECTION_LABELS } from './constants.js'
 import { tasksProgress, nearestDue, daysUntil, dDayLabel, filterVolumeWorks, groupByPart, partLabel } from './boardUtils.js'
 import MultiSelectDropdown from './MultiSelectDropdown.jsx'
 
@@ -10,30 +10,21 @@ const SELECTION_BADGE = {
   confirmed: 'bg-blue-100 text-blue-800',
   excluded: 'bg-gray-200 text-gray-400 line-through',
 }
-const PRODUCTION_BADGE = {
-  not_started: 'bg-gray-100 text-gray-500',
-  in_progress: 'bg-green-100 text-green-800',
-  review: 'bg-purple-100 text-purple-800',
-  completed: 'bg-blue-600 text-white',
-}
 
 export default function VolumeWorkList({ works, tasksByVw, members, parts = [], selectedId, onSelect, onMove }) {
   const [selection, setSelection] = useState([])
-  const [production, setProduction] = useState([])
   const [assignee, setAssignee] = useState([])
   const [dueSoon, setDueSoon] = useState(false)
-  const [hideCompleted, setHideCompleted] = useState(false)
 
   const memberNameById = useMemo(() => Object.fromEntries(members.map(m => [m.id, m.name])), [members])
 
   const selectionKeys = Object.keys(SELECTION_LABELS)
-  const productionKeys = Object.keys(PRODUCTION_LABELS)
 
   const filtered = useMemo(
     () => filterVolumeWorks(works, tasksByVw, {
-      selection, production, assignee, dueSoon, hideCompleted,
+      selection, assignee, dueSoon,
     }),
-    [works, tasksByVw, selection, production, assignee, dueSoon, hideCompleted],
+    [works, tasksByVw, selection, assignee, dueSoon],
   )
 
   const renderRow = vw => {
@@ -52,9 +43,6 @@ export default function VolumeWorkList({ works, tasksByVw, members, parts = [], 
         </div>
         <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs ${SELECTION_BADGE[vw.selection_status]}`}>
           {SELECTION_LABELS[vw.selection_status]}
-        </span>
-        <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs ${PRODUCTION_BADGE[vw.production_status]} ${vw.selection_status === 'excluded' ? 'opacity-40' : ''}`}>
-          {PRODUCTION_LABELS[vw.production_status]}
         </span>
         {total > 0 && <span className={`shrink-0 text-xs text-gray-600 ${vw.selection_status === 'excluded' ? 'opacity-40' : ''}`}>{done}/{total}</span>}
         {due && (
@@ -79,19 +67,12 @@ export default function VolumeWorkList({ works, tasksByVw, members, parts = [], 
           options={selectionKeys.map(k => SELECTION_LABELS[k])}
           selected={selection.map(k => SELECTION_LABELS[k])}
           onChange={labels => setSelection(selectionKeys.filter(k => labels.includes(SELECTION_LABELS[k])))} />
-        <MultiSelectDropdown label="제작 상태"
-          options={productionKeys.map(k => PRODUCTION_LABELS[k])}
-          selected={production.map(k => PRODUCTION_LABELS[k])}
-          onChange={labels => setProduction(productionKeys.filter(k => labels.includes(PRODUCTION_LABELS[k])))} />
         <MultiSelectDropdown label="담당자"
           options={members.map(m => m.name)}
           selected={assignee.map(id => memberNameById[id]).filter(Boolean)}
           onChange={names => setAssignee(members.filter(m => names.includes(m.name)).map(m => m.id))} />
         <label className="flex items-center gap-1">
           <input type="checkbox" checked={dueSoon} onChange={e => setDueSoon(e.target.checked)} /> 마감 임박
-        </label>
-        <label className="flex items-center gap-1">
-          <input type="checkbox" checked={hideCompleted} onChange={e => setHideCompleted(e.target.checked)} /> 완료 숨김
         </label>
       </div>
 

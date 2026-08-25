@@ -53,17 +53,15 @@ export function nearestDue(tasks) {
 }
 
 export function filterVolumeWorks(rows, tasksByVw, filters = {}, now = new Date()) {
-  const { selection = [], production = [], assignee = [], dueSoon = false, hideCompleted = false } = filters
+  const { selection = [], assignee = [], dueSoon = false } = filters
   return rows.filter(row => {
     const tasks = tasksByVw[row.id] || []
     if (selection.length && !selection.includes(row.selection_status)) return false
-    if (production.length && !production.includes(row.production_status)) return false
     if (assignee.length && !tasks.some(t => assignee.includes(t.assignee_id))) return false
     if (dueSoon) {
       const hit = tasks.some(t => t.status !== 'done' && t.due_date && daysUntil(t.due_date, now) <= 7)
       if (!hit) return false
     }
-    if (hideCompleted && row.production_status === 'completed') return false
     return true
   })
 }

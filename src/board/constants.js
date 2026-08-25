@@ -7,13 +7,6 @@ export const SELECTION_LABELS = {
   excluded: '제외',
 }
 
-export const PRODUCTION_LABELS = {
-  not_started: '미착수',
-  in_progress: '진행 중',
-  review: '검토 중',
-  completed: '완료',
-}
-
 export const TASK_STATUS_LABELS = {
   todo: '예정',
   in_progress: '진행 중',
@@ -24,12 +17,8 @@ export const TASK_STATUS_LABELS = {
 export const TASK_PRESETS = [
   { type: 'source', label: '작품 본문 확보' },
   { type: 'copyright', label: '저작권 확인' },
-  { type: 'manuscript', label: '작품 원고 작성' },
+  { type: 'manuscript', label: '원고 집필' },
   { type: 'commentary', label: '해제 작성' },
   { type: 'extra', label: '부가 원고 작성' },
   { type: 'image', label: '이미지 확보' },
-  { type: 'edit_review', label: '편집 검토' },
-  { type: 'typeset', label: '조판' },
-  { type: 'proof', label: '교정' },
-  { type: 'final', label: '최종 확인' },
 ]

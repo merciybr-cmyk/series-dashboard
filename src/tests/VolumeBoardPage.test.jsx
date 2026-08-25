@@ -25,6 +25,7 @@ vi.mock('../board/volumeApi.js', () => ({
 }))
 const { default: VolumeBoardPage } = await import('../board/VolumeBoardPage.jsx')
 const { ToastProvider } = await import('../components/Toast.jsx')
+const api = await import('../board/volumeApi.js')
 
 test('권 헤더·검색 패널·수록 목록이 함께 렌더링된다', async () => {
   window.location.hash = '#/volumes/v1'
@@ -51,4 +52,23 @@ test('부 관리 버튼이 보드에 렌더링된다', async () => {
     </ToastProvider>,
   )
   await waitFor(() => expect(screen.getByRole('button', { name: '부 관리' })).toBeInTheDocument())
+})
+
+test("권 상태가 '제작중'(legacy)이어도 표시되고 옵션은 4종+legacy", async () => {
+  api.getBoard.mockResolvedValue({
+    volume: { id: 'v1', number: 3, title: '성장', status: '제작중' },
+    parts: [], works: [], tasks: [],
+  })
+  window.location.hash = '#/volumes/v1'
+  render(
+    <ToastProvider>
+      <HashRouter>
+        <Routes><Route path="/volumes/:id" element={<VolumeBoardPage />} /></Routes>
+      </HashRouter>
+    </ToastProvider>,
+  )
+  const select = await screen.findByLabelText('권 상태')
+  expect(select).toHaveValue('제작중')
+  const labels = [...select.options].map(o => o.textContent)
+  expect(labels).toEqual(['제작중', '기획', '선정중', '확정', '완료'])
 })

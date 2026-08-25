@@ -57,21 +57,18 @@ test('filterVolumeWorks: 선정·제작·담당자·마감임박·완료숨김',
   }
   expect(filterVolumeWorks(rows, tasksByVw, { selection: ['confirmed'] }, NOW).map(r => r.id))
     .toEqual(['vw1', 'vw3'])
-  expect(filterVolumeWorks(rows, tasksByVw, { production: ['not_started'] }, NOW).map(r => r.id))
-    .toEqual(['vw2'])
   expect(filterVolumeWorks(rows, tasksByVw, { assignee: ['m1'] }, NOW).map(r => r.id))
     .toEqual(['vw1'])
   expect(filterVolumeWorks(rows, tasksByVw, { dueSoon: true }, NOW).map(r => r.id))
     .toEqual(['vw1'])
-  expect(filterVolumeWorks(rows, tasksByVw, { hideCompleted: true }, NOW).map(r => r.id))
-    .toEqual(['vw1', 'vw2'])
 })
 
-test('TASK_PRESETS: 10종, 라벨 존재', () => {
-  expect(TASK_PRESETS).toHaveLength(10)
-  expect(TASK_PRESETS[0]).toHaveProperty('type')
-  expect(TASK_PRESETS[0]).toHaveProperty('label')
-  expect(SELECTION_LABELS.confirmed).toBe('확정')
+test('TASK_PRESETS: 6종, 편집 공정 없음', () => {
+  expect(TASK_PRESETS).toHaveLength(6)
+  expect(TASK_PRESETS.map(p => p.type)).toEqual(
+    ['source', 'copyright', 'manuscript', 'commentary', 'extra', 'image'],
+  )
+  expect(TASK_PRESETS.find(p => p.type === 'manuscript').label).toBe('원고 집필')
 })
 
 test('partLabel: 제목 유무에 따라', () => {

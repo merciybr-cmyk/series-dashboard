@@ -11,7 +11,7 @@ import WorkDetailPanel from './WorkDetailPanel.jsx'
 import PartControls from './PartControls.jsx'
 import { useToast } from '../components/Toast.jsx'
 
-const VOLUME_STATUSES = ['기획', '선정중', '확정', '제작중', '완료']
+const VOLUME_STATUSES = ['기획', '선정중', '확정', '완료']
 const EMPTY_TASKS = []
 
 export default function VolumeBoardPage() {
@@ -103,7 +103,10 @@ export default function VolumeBoardPage() {
           aria-label="권 상태"
           className="rounded border border-gray-300 px-2 py-1 text-sm"
         >
-          {VOLUME_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+          {(VOLUME_STATUSES.includes(board.volume.status)
+            ? VOLUME_STATUSES
+            : [board.volume.status, ...VOLUME_STATUSES]
+          ).map(s => <option key={s} value={s}>{s}</option>)}
         </select>
         <span className="ml-auto text-sm text-gray-400">
           수록 {board.works.length}건 · 확정 {board.works.filter(w => w.selection_status === 'confirmed').length}건

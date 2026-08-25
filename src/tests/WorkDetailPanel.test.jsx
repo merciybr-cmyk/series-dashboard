@@ -25,7 +25,7 @@ test('작품 정보·다른 권 수록·진행률을 보여준다', () => {
     duplicates={[{ volumeNumber: 2, selection_status: 'confirmed' }]} actions={makeActions()} onClose={() => {}} />)
   expect(screen.getByText('소나기')).toBeInTheDocument()
   expect(screen.getByText(/2권/)).toBeInTheDocument()
-  expect(screen.getByText('1/2')).toBeInTheDocument()
+  expect(screen.getByText('업무 (1/2)')).toBeInTheDocument()
 })
 
 test('체크박스로 업무를 완료 처리한다', async () => {
@@ -41,20 +41,12 @@ test('프리셋을 골라 업무를 추가한다', async () => {
   render(<WorkDetailPanel volumeWork={VW} tasks={[]} members={MEMBERS} duplicates={[]} actions={actions} onClose={() => {}} />)
   await userEvent.click(screen.getByRole('button', { name: '업무 추가' }))
   await userEvent.click(screen.getByLabelText('해제 작성'))
-  await userEvent.click(screen.getByLabelText('교정'))
+  await userEvent.click(screen.getByLabelText('이미지 확보'))
   await userEvent.click(screen.getByRole('button', { name: '선택한 업무 추가' }))
   expect(actions.addTasks).toHaveBeenCalledWith('vw1', [
     { task_type: 'commentary', title: '해제 작성', sort_order: 10 },
-    { task_type: 'proof', title: '교정', sort_order: 20 },
+    { task_type: 'image', title: '이미지 확보', sort_order: 20 },
   ])
-})
-
-test('모든 업무 완료 시 제작 완료 제안이 뜬다', async () => {
-  const actions = makeActions()
-  const tasks = [{ id: 't1', title: '교정', status: 'done' }]
-  render(<WorkDetailPanel volumeWork={VW} tasks={tasks} members={MEMBERS} duplicates={[]} actions={actions} onClose={() => {}} />)
-  await userEvent.click(screen.getByRole('button', { name: '완료로 변경' }))
-  expect(actions.setVolumeWork).toHaveBeenCalledWith('vw1', { production_status: 'completed' })
 })
 
 test('부가 있으면 부 지정 select를 보여주고 변경을 전달한다', async () => {
