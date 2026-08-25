@@ -62,3 +62,9 @@ test('다른 권 수록 뱃지를 표시한다', () => {
     selectedId={null} onSelect={() => {}} onMove={() => {}} />)
   expect(screen.getByText('2권 확정')).toBeInTheDocument()
 })
+
+test('자료가 있는 작품에 📄를 표시한다', () => {
+  render(<VolumeWorkList works={[WORKS[0]]} tasksByVw={TASKS} members={[]} hasFiles={new Set(['vw1'])}
+    selectedId={null} onSelect={() => {}} onMove={() => {}} />)
+  expect(screen.getByText('📄')).toBeInTheDocument()
+})

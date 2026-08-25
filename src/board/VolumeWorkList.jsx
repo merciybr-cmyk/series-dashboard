@@ -11,7 +11,7 @@ const SELECTION_BADGE = {
   excluded: 'bg-gray-200 text-gray-400 line-through',
 }
 
-export default function VolumeWorkList({ works, tasksByVw, members, parts = [], crossDups = new Map(), selectedId, onSelect, onMove }) {
+export default function VolumeWorkList({ works, tasksByVw, members, parts = [], crossDups = new Map(), hasFiles = new Set(), selectedId, onSelect, onMove }) {
   const [selection, setSelection] = useState([])
   const [assignee, setAssignee] = useState([])
   const [dueSoon, setDueSoon] = useState(false)
@@ -38,7 +38,10 @@ export default function VolumeWorkList({ works, tasksByVw, members, parts = [], 
         onClick={() => onSelect(vw.id)}
       >
         <div className="min-w-0 flex-1">
-          <div className="truncate font-medium">{vw.work_snapshot.title}</div>
+          <div className="truncate font-medium">
+            {vw.work_snapshot.title}
+            {hasFiles.has(vw.id) && <span className="ml-1" title="자료 있음">📄</span>}
+          </div>
           <div className="truncate text-xs text-gray-500">{vw.work_snapshot.author}</div>
         </div>
         {(crossDups.get(vw.work_id) || []).map(d => (

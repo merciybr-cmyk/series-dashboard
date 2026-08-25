@@ -1,6 +1,6 @@
 // 권 보드 화면 조립: 좌 검색, 우 수록 목록, 우측 끝 상세 패널
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useWorksData } from '../works/useWorksData.js'
 import { buildRegistryMap, workKeyOf, keyOf } from '../works/workKey.js'
 import { useVolumeBoard } from './useVolumeBoard.js'
@@ -19,11 +19,19 @@ export default function VolumeBoardPage() {
   const { works: sheetWorks, loading: sheetLoading, error: sheetError, retry } = useWorksData()
   const board = useVolumeBoard(volumeId)
   const { show } = useToast()
+  const [searchParams] = useSearchParams()
 
   const [registry, setRegistry] = useState([])
   const [allVw, setAllVw] = useState([])
+  const [allFiles, setAllFiles] = useState([])
   const [selectedId, setSelectedId] = useState(null)
   const [activePart, setActivePart] = useState('all')
+
+  useEffect(() => {
+    const vwParam = searchParams.get('vw')
+    if (vwParam) setSelectedId(vwParam)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (activePart !== 'all' && activePart !== 'none' && !board.parts.some(p => p.id === activePart)) {
@@ -34,10 +42,13 @@ export default function VolumeBoardPage() {
   const loadDupData = useCallback(() => {
     api.listRegistry().then(setRegistry).catch(() => {})
     api.listAllVolumeWorks().then(setAllVw).catch(() => {})
+    api.listAllFiles().then(setAllFiles).catch(() => {})
   }, [])
   useEffect(loadDupData, [loadDupData, board.works])
 
   const registryMap = useMemo(() => buildRegistryMap(registry), [registry])
+
+  const hasFiles = useMemo(() => new Set(allFiles.map(f => f.volume_work_id)), [allFiles])
 
   // work_id → 수록처 목록, 그리고 시트 키 → 수록처 목록 (registry 경유)
   const duplicatesByWorkId = useMemo(() => {
@@ -151,6 +162,7 @@ export default function VolumeBoardPage() {
             tasksByVw={board.tasksByVw}
             members={board.members}
             crossDups={crossDups}
+            hasFiles={hasFiles}
             selectedId={selectedId}
             onSelect={setSelectedId}
             onMove={board.actions.move}
@@ -166,6 +178,7 @@ export default function VolumeBoardPage() {
             parts={board.parts}
             actions={board.actions}
             onClose={() => setSelectedId(null)}
+            onFilesChanged={loadDupData}
           />
         )}
       </div>

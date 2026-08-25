@@ -1,8 +1,8 @@
-// 작품 상세 패널 (설계 §5.1): 정보 / 선정 / 업무 체크리스트 / 검토 의견 / 이력
-import { useEffect, useMemo, useState } from 'react'
+// 작품 상세 패널 (설계 §5.1): 정보 / 선정 / 업무 체크리스트 / 검토 의견 / 자료 / 이력
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { SELECTION_LABELS, TASK_PRESETS } from './constants.js'
 import { tasksProgress, daysUntil, dDayLabel, partLabel } from './boardUtils.js'
-import { listActivityFor, listComments, addComment, deleteComment } from './volumeApi.js'
+import { listActivityFor, listComments, addComment, deleteComment, listFiles, uploadFile, addFileLink, deleteFile, getFileUrl } from './volumeApi.js'
 import { useToast } from '../components/Toast.jsx'
 
 function Section({ title, children }) {
@@ -14,7 +14,7 @@ function Section({ title, children }) {
   )
 }
 
-export default function WorkDetailPanel({ volumeWork: vw, tasks, members, duplicates, parts = [], actions, onClose }) {
+export default function WorkDetailPanel({ volumeWork: vw, tasks, members, duplicates, parts = [], actions, onClose, onFilesChanged }) {
   const [adding, setAdding] = useState(false)
   const [picked, setPicked] = useState([])       // 프리셋 type 배열
   const [customTitle, setCustomTitle] = useState('')
@@ -22,6 +22,11 @@ export default function WorkDetailPanel({ volumeWork: vw, tasks, members, duplic
   const [activity, setActivity] = useState([])
   const [comments, setComments] = useState([])
   const [commentBody, setCommentBody] = useState('')
+  const [files, setFiles] = useState([])
+  const [linkOpen, setLinkOpen] = useState(false)
+  const [linkName, setLinkName] = useState('')
+  const [linkUrl, setLinkUrl] = useState('')
+  const fileInputRef = useRef(null)
   const { show } = useToast()
 
   useEffect(() => { setNote(vw.note || '') }, [vw.id, vw.note])
@@ -32,6 +37,10 @@ export default function WorkDetailPanel({ volumeWork: vw, tasks, members, duplic
 
   useEffect(() => {
     listComments(vw.id).then(setComments).catch(() => setComments([]))
+  }, [vw.id])
+
+  useEffect(() => {
+    listFiles(vw.id).then(setFiles).catch(() => setFiles([]))
   }, [vw.id])
 
   const memberName = id => members.find(m => m.id === id)?.name || '알 수 없음'
@@ -53,6 +62,57 @@ export default function WorkDetailPanel({ volumeWork: vw, tasks, members, duplic
     try {
       await deleteComment(id)
       setComments(cs => cs.filter(c => c.id !== id))
+    } catch (err) {
+      show(err.message)
+    }
+  }
+
+  async function handleUpload(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (file.size > 50 * 1024 * 1024) {
+      show('50MB 이하 파일만 업로드할 수 있습니다. 링크 첨부를 이용해 주세요.')
+      return
+    }
+    try {
+      const row = await uploadFile(vw.id, file)
+      setFiles(fs => [...fs, row])
+      onFilesChanged?.()
+    } catch (err) {
+      show(err.message)
+    }
+  }
+
+  async function submitLink() {
+    const name = linkName.trim()
+    const url = linkUrl.trim()
+    if (!name || !url) return
+    try {
+      const row = await addFileLink(vw.id, name, url)
+      setFiles(fs => [...fs, row])
+      setLinkOpen(false); setLinkName(''); setLinkUrl('')
+      onFilesChanged?.()
+    } catch (err) {
+      show(err.message)
+    }
+  }
+
+  async function removeFile(f) {
+    if (!window.confirm(`'${f.name}' 자료를 삭제할까요?`)) return
+    try {
+      await deleteFile(f)
+      setFiles(fs => fs.filter(x => x.id !== f.id))
+      onFilesChanged?.()
+    } catch (err) {
+      show(err.message)
+    }
+  }
+
+  async function openFile(f) {
+    if (f.kind === 'link') { window.open(f.url, '_blank', 'noopener'); return }
+    try {
+      window.open(await getFileUrl(f.storage_path), '_blank', 'noopener')
     } catch (err) {
       show(err.message)
     }
@@ -227,6 +287,42 @@ export default function WorkDetailPanel({ volumeWork: vw, tasks, members, duplic
         />
         <button type="button" onClick={submitComment}
           className="mt-1 rounded bg-blue-600 px-3 py-1 text-sm font-medium text-white">의견 남기기</button>
+      </Section>
+
+      <Section title={`자료 ${files.length ? `(${files.length})` : ''}`}>
+        <ul className="mb-2 space-y-1">
+          {files.map(f => (
+            <li key={f.id} className="flex items-center gap-2 text-sm">
+              <button type="button" onClick={() => openFile(f)}
+                className="min-w-0 flex-1 truncate text-left text-blue-700 hover:underline">
+                <span>{f.kind === 'link' ? '🔗' : '📄'}</span> <span>{f.name}</span>
+              </button>
+              <span className="shrink-0 text-xs text-gray-400">
+                {memberName(f.uploaded_by)} · {new Date(f.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}
+              </span>
+              <button type="button" aria-label={`${f.name} 삭제`} onClick={() => removeFile(f)}
+                className="shrink-0 text-gray-300 hover:text-red-500">✕</button>
+            </li>
+          ))}
+          {!files.length && <li className="text-xs text-gray-300">해제 원고 등 자료를 올려 두세요</li>}
+        </ul>
+        <div className="flex gap-2">
+          <input ref={fileInputRef} type="file" aria-label="파일 선택" onChange={handleUpload} className="hidden" id="file-upload-input" />
+          <button type="button" onClick={() => fileInputRef.current?.click()}
+            className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-600">파일 업로드</button>
+          <button type="button" onClick={() => setLinkOpen(o => !o)}
+            className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-600">링크 첨부</button>
+        </div>
+        {linkOpen && (
+          <div className="mt-2 space-y-1">
+            <input value={linkName} onChange={e => setLinkName(e.target.value)} placeholder="자료 이름"
+              className="w-full rounded border border-gray-300 px-2 py-1 text-sm" />
+            <input value={linkUrl} onChange={e => setLinkUrl(e.target.value)} placeholder="https://…"
+              className="w-full rounded border border-gray-300 px-2 py-1 text-sm" />
+            <button type="button" onClick={submitLink}
+              className="rounded bg-blue-600 px-3 py-1 text-sm font-medium text-white">등록</button>
+          </div>
+        )}
       </Section>
 
       <Section title="최근 변경">
