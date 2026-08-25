@@ -49,6 +49,15 @@ export default function VolumeBoardPage() {
     return map
   }, [allVw])
 
+  const crossDups = useMemo(() => {
+    const map = new Map()
+    for (const [workId, dups] of duplicatesByWorkId) {
+      const others = dups.filter(d => d.volumeId !== volumeId)
+      if (others.length) map.set(workId, others)
+    }
+    return map
+  }, [duplicatesByWorkId, volumeId])
+
   const duplicatesByKey = useMemo(() => {
     const map = new Map()
     for (const row of registry) {
@@ -141,6 +150,7 @@ export default function VolumeBoardPage() {
             parts={activePart === 'all' ? board.parts : []}
             tasksByVw={board.tasksByVw}
             members={board.members}
+            crossDups={crossDups}
             selectedId={selectedId}
             onSelect={setSelectedId}
             onMove={board.actions.move}

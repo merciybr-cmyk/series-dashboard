@@ -11,7 +11,7 @@ const SELECTION_BADGE = {
   excluded: 'bg-gray-200 text-gray-400 line-through',
 }
 
-export default function VolumeWorkList({ works, tasksByVw, members, parts = [], selectedId, onSelect, onMove }) {
+export default function VolumeWorkList({ works, tasksByVw, members, parts = [], crossDups = new Map(), selectedId, onSelect, onMove }) {
   const [selection, setSelection] = useState([])
   const [assignee, setAssignee] = useState([])
   const [dueSoon, setDueSoon] = useState(false)
@@ -41,6 +41,12 @@ export default function VolumeWorkList({ works, tasksByVw, members, parts = [], 
           <div className="truncate font-medium">{vw.work_snapshot.title}</div>
           <div className="truncate text-xs text-gray-500">{vw.work_snapshot.author}</div>
         </div>
+        {(crossDups.get(vw.work_id) || []).map(d => (
+          <span key={d.volumeNumber}
+            className={`shrink-0 rounded px-1.5 py-0.5 text-xs ${d.selection_status === 'confirmed' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}>
+            {d.volumeNumber}권 {SELECTION_LABELS[d.selection_status]}
+          </span>
+        ))}
         <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs ${SELECTION_BADGE[vw.selection_status]}`}>
           {SELECTION_LABELS[vw.selection_status]}
         </span>

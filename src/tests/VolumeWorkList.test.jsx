@@ -54,3 +54,11 @@ test('부가 없고 필터 결과가 0건이면 빈 문구가 하나만 보인�
   expect(screen.getByText('표시할 작품이 없습니다')).toBeInTheDocument()
   expect(screen.queryByText('이 부에 작품이 없습니다')).not.toBeInTheDocument()
 })
+
+test('다른 권 수록 뱃지를 표시한다', () => {
+  const crossDups = new Map([['W000001', [{ volumeNumber: 2, selection_status: 'confirmed' }]]])
+  const works = [{ ...WORKS[0], work_id: 'W000001' }]
+  render(<VolumeWorkList works={works} tasksByVw={TASKS} members={[]} crossDups={crossDups}
+    selectedId={null} onSelect={() => {}} onMove={() => {}} />)
+  expect(screen.getByText('2권 확정')).toBeInTheDocument()
+})

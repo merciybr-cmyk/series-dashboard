@@ -21,9 +21,11 @@ export default function SearchPane({ works, duplicatesByKey, onAdd }) {
     const map = new Map()
     for (const w of filtered) {
       const key = workKeyOf(w)
-      if (!map.has(key)) map.set(key, w)
+      const entry = map.get(key)
+      if (entry) entry.count += 1
+      else map.set(key, { rep: w, count: 1 })
     }
-    return [...map.entries()] // [key, 대표행]
+    return [...map.entries()] // [key, {rep, count}]
   }, [works, curriculum, genre, query])
 
   return (
@@ -42,7 +44,7 @@ export default function SearchPane({ works, duplicatesByKey, onAdd }) {
       <p className="mb-1 text-xs text-gray-400">작품 {grouped.length}건{grouped.length > MAX_SHOWN ? ` (상위 ${MAX_SHOWN}건 표시)` : ''}</p>
 
       <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
-        {grouped.slice(0, MAX_SHOWN).map(([key, w]) => {
+        {grouped.slice(0, MAX_SHOWN).map(([key, { rep: w, count }]) => {
           const dups = duplicatesByKey.get(key) || []
           return (
             <li key={key} className="flex items-center gap-2 rounded border border-gray-100 px-3 py-2 text-sm">
@@ -52,6 +54,7 @@ export default function SearchPane({ works, duplicatesByKey, onAdd }) {
                   {w._authorBase} · {w['장르']}
                 </div>
               </div>
+              <span className="shrink-0 text-xs text-gray-400">수록 {count}회</span>
               {dups.map(d => (
                 <span
                   key={d.volumeNumber}

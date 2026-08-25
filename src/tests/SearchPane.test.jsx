@@ -39,3 +39,9 @@ test('이미 수록된 작품에는 선정 상태를 포함한 권 뱃지를 단
   expect(screen.getByText('2권 확정')).toBeInTheDocument()
   expect(screen.getByText('4권 후보')).toBeInTheDocument()
 })
+
+test('작품별 수록 횟수를 표시한다', () => {
+  render(<SearchPane works={WORKS} duplicatesByKey={new Map()} onAdd={() => {}} />)
+  expect(screen.getByText('수록 2회')).toBeInTheDocument()  // 소나기
+  expect(screen.getByText('수록 1회')).toBeInTheDocument()  // 별 헤는 밤
+})
