@@ -101,3 +101,21 @@ test('의견·비교 API가 존재한다', () => {
   expect(typeof api.deleteComment).toBe('function')
   expect(typeof api.listAllParts).toBe('function')
 })
+
+test('전역 조회·자료 API가 존재한다', () => {
+  for (const fn of ['listAllTasks', 'listAllFiles', 'listActivity', 'listFiles', 'uploadFile', 'addFileLink', 'deleteFile', 'getFileUrl']) {
+    expect(typeof api[fn]).toBe('function')
+  }
+})
+
+test('uploadFile: storage 업로드 성공 시 files에 insert한다', async () => {
+  mockSupabase.storage = {
+    from: vi.fn(() => ({
+      upload: vi.fn().mockResolvedValue({ error: null }),
+    })),
+  }
+  fromResults.push({ data: { id: 'f1', kind: 'upload', name: '해제.hwp' }, error: null })
+  const row = await api.uploadFile('vw1', { name: '해제.hwp', size: 1000 })
+  expect(row.kind).toBe('upload')
+  expect(mockSupabase.storage.from).toHaveBeenCalledWith('attachments')
+})

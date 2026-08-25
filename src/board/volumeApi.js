@@ -171,6 +171,71 @@ export async function deleteComment(id) {
   unwrap(await supabase.from('work_comments').delete().eq('id', id))
 }
 
+// ---------- 전역 조회 (홈 화면) ----------
+
+export async function listAllTasks() {
+  return unwrap(
+    await supabase.from('work_tasks')
+      .select('*, volume_works(id, volume_id, work_id, selection_status, work_snapshot, volumes(number, title))'),
+  )
+}
+
+export async function listAllFiles() {
+  return unwrap(
+    await supabase.from('files').select('id, volume_work_id, kind, name')
+      .not('volume_work_id', 'is', null),
+  )
+}
+
+export async function listActivity(limit = 20) {
+  return unwrap(
+    await supabase.from('activity_log').select('*').order('id', { ascending: false }).limit(limit),
+  )
+}
+
+// ---------- files (작품 자료 — 설계 §5.1) ----------
+
+const BUCKET = 'attachments'
+
+export async function listFiles(volumeWorkId) {
+  return unwrap(
+    await supabase.from('files').select('*')
+      .eq('volume_work_id', volumeWorkId).order('created_at'),
+  )
+}
+
+export async function uploadFile(volumeWorkId, file) {
+  const path = `${volumeWorkId}/${Date.now()}_${file.name}`
+  const { error } = await supabase.storage.from(BUCKET).upload(path, file)
+  if (error) throw new Error(error.message)
+  return unwrap(
+    await supabase.from('files')
+      .insert({ name: file.name, volume_work_id: volumeWorkId, kind: 'upload', storage_path: path })
+      .select().single(),
+  )
+}
+
+export async function addFileLink(volumeWorkId, name, url) {
+  return unwrap(
+    await supabase.from('files')
+      .insert({ name, volume_work_id: volumeWorkId, kind: 'link', url })
+      .select().single(),
+  )
+}
+
+export async function deleteFile(fileRow) {
+  if (fileRow.kind === 'upload' && fileRow.storage_path) {
+    await supabase.storage.from(BUCKET).remove([fileRow.storage_path])
+  }
+  unwrap(await supabase.from('files').delete().eq('id', fileRow.id))
+}
+
+export async function getFileUrl(storagePath) {
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(storagePath, 3600)
+  if (error) throw new Error(error.message)
+  return data.signedUrl
+}
+
 // ---------- 기타 ----------
 
 export async function listMembers() {
