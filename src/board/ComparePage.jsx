@@ -56,7 +56,7 @@ export default function ComparePage() {
         <span className="text-xs text-gray-400">노란 배경 = 다른 권과 겹치는 작품 (제외 상태는 겹침에서 뺌)</span>
       </div>
 
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div className="grid gap-4 pb-4 md:grid-cols-2 xl:grid-cols-4">
         {volumes.map(v => {
           const works = allVw
             .filter(w => w.volume_id === v.id)
@@ -65,7 +65,7 @@ export default function ComparePage() {
           const parts = allParts.filter(p => p.volume_id === v.id)
           const groups = groupByPart(works, parts)
           return (
-            <div key={v.id} className="w-72 shrink-0 rounded border border-gray-200">
+            <div key={v.id} className="rounded border border-gray-200">
               <Link to={`/volumes/${v.id}`} className="block border-b border-gray-200 bg-gray-50 px-3 py-2 font-semibold hover:bg-gray-100">
                 {v.number}권 {v.title}
                 <span className="ml-2 text-xs font-normal text-gray-500">{works.length}편 · {v.status}</span>
