@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthProvider.jsx'
 const MENU = [
   { to: '/', label: '홈' },
   { to: '/volumes', label: '권별 작품 목록' },
+  { to: '/compare', label: '권별 비교' },
   { to: '/schedule', label: '일정' },
   { to: '/library', label: '자료실' },
   { to: '/contacts', label: '연락처' },
