@@ -112,7 +112,7 @@ export default function WorkDetailPanel({ volumeWork: vw, tasks, members, duplic
   async function openFile(f) {
     if (f.kind === 'link') { window.open(f.url, '_blank', 'noopener'); return }
     try {
-      window.open(await getFileUrl(f.storage_path), '_blank', 'noopener')
+      window.open(await getFileUrl(f.storage_path, f.name), '_blank', 'noopener')
     } catch (err) {
       show(err.message)
     }

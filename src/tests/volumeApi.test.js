@@ -119,3 +119,18 @@ test('uploadFile: storage 업로드 성공 시 files에 insert한다', async () 
   expect(row.kind).toBe('upload')
   expect(mockSupabase.storage.from).toHaveBeenCalledWith('attachments')
 })
+
+test('uploadFile: 한글 파일명은 스토리지 키에서 ASCII로 치환된다', async () => {
+  const upload = vi.fn().mockResolvedValue({ error: null })
+  mockSupabase.storage = {
+    from: vi.fn(() => ({ upload })),
+  }
+  fromResults.push({ data: { id: 'f2', kind: 'upload', name: '해제_소나기.hwp' }, error: null })
+  await api.uploadFile('vw1', { name: '해제_소나기.hwp', size: 100 })
+  const [path] = upload.mock.calls[0]
+  expect(path).toMatch(/^vw1\/\d+_[\w.-]+$/)
+})
+
+test('addFileLink: http(s)가 아닌 URL은 거부한다', async () => {
+  await expect(api.addFileLink('vw1', 'x', 'javascript:alert(1)')).rejects.toThrow('http')
+})

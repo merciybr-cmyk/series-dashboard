@@ -205,7 +205,9 @@ export async function listFiles(volumeWorkId) {
 }
 
 export async function uploadFile(volumeWorkId, file) {
-  const path = `${volumeWorkId}/${Date.now()}_${file.name}`
+  // 스토리지 키는 ASCII만 허용 — 한글 파일명은 키에서 치환하고 원본명은 files.name에 보존
+  const safeName = file.name.replace(/[^\w.-]+/g, '_')
+  const path = `${volumeWorkId}/${Date.now()}_${safeName}`
   const { error } = await supabase.storage.from(BUCKET).upload(path, file)
   if (error) throw new Error(error.message)
   return unwrap(
@@ -216,6 +218,7 @@ export async function uploadFile(volumeWorkId, file) {
 }
 
 export async function addFileLink(volumeWorkId, name, url) {
+  if (!/^https?:\/\//i.test(url)) throw new Error('링크는 http:// 또는 https:// 로 시작해야 합니다')
   return unwrap(
     await supabase.from('files')
       .insert({ name, volume_work_id: volumeWorkId, kind: 'link', url })
@@ -230,8 +233,9 @@ export async function deleteFile(fileRow) {
   unwrap(await supabase.from('files').delete().eq('id', fileRow.id))
 }
 
-export async function getFileUrl(storagePath) {
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(storagePath, 3600)
+export async function getFileUrl(storagePath, downloadName) {
+  const { data, error } = await supabase.storage.from(BUCKET)
+    .createSignedUrl(storagePath, 3600, downloadName ? { download: downloadName } : undefined)
   if (error) throw new Error(error.message)
   return data.signedUrl
 }
