@@ -15,17 +15,25 @@ export default function SearchPane({ works, duplicatesByKey, onAdd }) {
   const curriculumOptions = useMemo(() => getUniqueValues(works, '교육과정'), [works])
   const genreOptions = useMemo(() => getUniqueValues(works, '장르'), [works])
 
+  // 수록 횟수는 필터와 무관한 전체 시트 기준 (채택 빈도 지표)
+  const countsByKey = useMemo(() => {
+    const m = new Map()
+    for (const w of works) {
+      const k = workKeyOf(w)
+      m.set(k, (m.get(k) || 0) + 1)
+    }
+    return m
+  }, [works])
+
   // 필터 → 작품 단위 그룹핑 (첫 행을 대표로)
   const grouped = useMemo(() => {
     const filtered = filterWorks(works, { curriculum, genre, query })
     const map = new Map()
     for (const w of filtered) {
       const key = workKeyOf(w)
-      const entry = map.get(key)
-      if (entry) entry.count += 1
-      else map.set(key, { rep: w, count: 1 })
+      if (!map.has(key)) map.set(key, { rep: w })
     }
-    return [...map.entries()] // [key, {rep, count}]
+    return [...map.entries()] // [key, {rep}]
   }, [works, curriculum, genre, query])
 
   return (
@@ -44,7 +52,7 @@ export default function SearchPane({ works, duplicatesByKey, onAdd }) {
       <p className="mb-1 text-xs text-gray-400">작품 {grouped.length}건{grouped.length > MAX_SHOWN ? ` (상위 ${MAX_SHOWN}건 표시)` : ''}</p>
 
       <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
-        {grouped.slice(0, MAX_SHOWN).map(([key, { rep: w, count }]) => {
+        {grouped.slice(0, MAX_SHOWN).map(([key, { rep: w }]) => {
           const dups = duplicatesByKey.get(key) || []
           return (
             <li key={key} className="flex items-center gap-2 rounded border border-gray-100 px-3 py-2 text-sm">
@@ -54,7 +62,7 @@ export default function SearchPane({ works, duplicatesByKey, onAdd }) {
                   {w._authorBase} · {w['장르']}
                 </div>
               </div>
-              <span className="shrink-0 text-xs text-gray-400">수록 {count}회</span>
+              <span className="shrink-0 text-xs text-gray-400">수록 {countsByKey.get(key)}회</span>
               {dups.map(d => (
                 <span
                   key={d.volumeNumber}

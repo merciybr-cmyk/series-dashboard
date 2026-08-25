@@ -1,4 +1,4 @@
-// 작품 상세 패널 (설계 §5.1): 정보 / 선정 / 제작(업무 체크리스트) / 이력
+// 작품 상세 패널 (설계 §5.1): 정보 / 선정 / 업무 체크리스트 / 검토 의견 / 이력
 import { useEffect, useMemo, useState } from 'react'
 import { SELECTION_LABELS, TASK_PRESETS } from './constants.js'
 import { tasksProgress, daysUntil, dDayLabel, partLabel } from './boardUtils.js'

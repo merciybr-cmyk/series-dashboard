@@ -45,3 +45,10 @@ test('작품별 수록 횟수를 표시한다', () => {
   expect(screen.getByText('수록 2회')).toBeInTheDocument()  // 소나기
   expect(screen.getByText('수록 1회')).toBeInTheDocument()  // 별 헤는 밤
 })
+
+test('필터가 걸려도 수록 횟수는 전체 기준이다', async () => {
+  render(<SearchPane works={WORKS} duplicatesByKey={new Map()} onAdd={() => {}} />)
+  await userEvent.click(screen.getByRole('button', { name: /교육과정/ }))
+  await userEvent.click(screen.getByLabelText('7차'))
+  expect(screen.getByText('수록 2회')).toBeInTheDocument()
+})
