@@ -46,7 +46,7 @@ export async function getBoard(volumeId) {
 export async function listAllVolumeWorks() {
   return unwrap(
     await supabase.from('volume_works')
-      .select('id, volume_id, work_id, selection_status, volumes(number, title)'),
+      .select('id, volume_id, work_id, part_id, sort_order, selection_status, work_snapshot, volumes(number, title)'),
   )
 }
 
@@ -94,6 +94,10 @@ export async function updatePart(id, patch) {
 
 export async function deletePart(id) {
   unwrap(await supabase.from('volume_parts').delete().eq('id', id))
+}
+
+export async function listAllParts() {
+  return unwrap(await supabase.from('volume_parts').select('*').order('number'))
 }
 
 // ---------- volume_works ----------
@@ -144,6 +148,27 @@ export async function updateTask(id, patch) {
 
 export async function deleteTask(id) {
   unwrap(await supabase.from('work_tasks').delete().eq('id', id))
+}
+
+// ---------- work_comments (검토 의견) ----------
+
+export async function listComments(volumeWorkId) {
+  return unwrap(
+    await supabase.from('work_comments').select('*')
+      .eq('volume_work_id', volumeWorkId).order('created_at'),
+  )
+}
+
+export async function addComment(volumeWorkId, body) {
+  return unwrap(
+    await supabase.from('work_comments')
+      .insert({ volume_work_id: volumeWorkId, body })
+      .select().single(),
+  )
+}
+
+export async function deleteComment(id) {
+  unwrap(await supabase.from('work_comments').delete().eq('id', id))
 }
 
 // ---------- 기타 ----------

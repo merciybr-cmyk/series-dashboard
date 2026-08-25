@@ -88,3 +88,16 @@ test('deleteVolume/deletePart/updatePart가 존재한다', () => {
   expect(typeof api.deletePart).toBe('function')
   expect(typeof api.updatePart).toBe('function')
 })
+
+test('addComment: volume_work_id와 body로 insert한다', async () => {
+  fromResults.push({ data: { id: 'c1', body: '좋은 선정입니다' }, error: null })
+  const c = await api.addComment('vw1', '좋은 선정입니다')
+  expect(c.body).toBe('좋은 선정입니다')
+  expect(mockSupabase.from).toHaveBeenCalledWith('work_comments')
+})
+
+test('의견·비교 API가 존재한다', () => {
+  expect(typeof api.listComments).toBe('function')
+  expect(typeof api.deleteComment).toBe('function')
+  expect(typeof api.listAllParts).toBe('function')
+})
