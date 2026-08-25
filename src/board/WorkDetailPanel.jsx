@@ -2,7 +2,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { SELECTION_LABELS, TASK_PRESETS } from './constants.js'
 import { tasksProgress, daysUntil, dDayLabel, partLabel } from './boardUtils.js'
-import { listActivityFor } from './volumeApi.js'
+import { listActivityFor, listComments, addComment, deleteComment } from './volumeApi.js'
+import { useToast } from '../components/Toast.jsx'
 
 function Section({ title, children }) {
   return (
@@ -19,12 +20,43 @@ export default function WorkDetailPanel({ volumeWork: vw, tasks, members, duplic
   const [customTitle, setCustomTitle] = useState('')
   const [note, setNote] = useState(vw.note || '')
   const [activity, setActivity] = useState([])
+  const [comments, setComments] = useState([])
+  const [commentBody, setCommentBody] = useState('')
+  const { show } = useToast()
 
   useEffect(() => { setNote(vw.note || '') }, [vw.id, vw.note])
 
   useEffect(() => {
     listActivityFor([vw.id, ...tasks.map(t => t.id)]).then(setActivity).catch(() => setActivity([]))
   }, [vw.id, vw.updated_at, tasks])
+
+  useEffect(() => {
+    listComments(vw.id).then(setComments).catch(() => setComments([]))
+  }, [vw.id])
+
+  const memberName = id => members.find(m => m.id === id)?.name || '알 수 없음'
+
+  async function submitComment() {
+    const body = commentBody.trim()
+    if (!body) return
+    try {
+      const c = await addComment(vw.id, body)
+      setComments(cs => [...cs, c])
+      setCommentBody('')
+    } catch (err) {
+      show(err.message)
+    }
+  }
+
+  async function removeComment(id) {
+    if (!window.confirm('이 의견을 삭제할까요?')) return
+    try {
+      await deleteComment(id)
+      setComments(cs => cs.filter(c => c.id !== id))
+    } catch (err) {
+      show(err.message)
+    }
+  }
 
   const { done, total } = tasksProgress(tasks)
   const snap = vw.work_snapshot
@@ -169,6 +201,32 @@ export default function WorkDetailPanel({ volumeWork: vw, tasks, members, duplic
           </button>
         )}
         </div>
+      </Section>
+
+      <Section title={`검토 의견 ${comments.length ? `(${comments.length})` : ''}`}>
+        <ul className="mb-2 space-y-2">
+          {comments.map(c => (
+            <li key={c.id} className="rounded bg-gray-50 px-2 py-1.5 text-sm">
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <span className="font-medium text-gray-700">{memberName(c.created_by)}</span>
+                <span>{new Date(c.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                <button type="button" aria-label="의견 삭제" onClick={() => removeComment(c.id)}
+                  className="ml-auto text-gray-300 hover:text-red-500">✕</button>
+              </div>
+              <p className="whitespace-pre-wrap">{c.body}</p>
+            </li>
+          ))}
+          {!comments.length && <li className="text-xs text-gray-300">아직 의견이 없습니다</li>}
+        </ul>
+        <textarea
+          value={commentBody}
+          onChange={e => setCommentBody(e.target.value)}
+          placeholder="검토 의견 (선정 논의, 우려, 제안)"
+          rows={2}
+          className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+        />
+        <button type="button" onClick={submitComment}
+          className="mt-1 rounded bg-blue-600 px-3 py-1 text-sm font-medium text-white">의견 남기기</button>
       </Section>
 
       <Section title="최근 변경">

@@ -4,8 +4,12 @@ import { vi } from 'vitest'
 
 vi.mock('../board/volumeApi.js', () => ({
   listActivityFor: vi.fn().mockResolvedValue([]),
+  listComments: vi.fn().mockResolvedValue([]),
+  addComment: vi.fn(),
+  deleteComment: vi.fn(),
 }))
 const { default: WorkDetailPanel } = await import('../board/WorkDetailPanel.jsx')
+const api = await import('../board/volumeApi.js')
 
 const VW = {
   id: 'vw1', selection_status: 'confirmed', production_status: 'in_progress', note: '',
@@ -57,4 +61,23 @@ test('부가 있으면 부 지정 select를 보여주고 변경을 전달한다'
   const select = screen.getByLabelText('부 지정')
   await userEvent.selectOptions(select, 'p1')
   expect(actions.setVolumeWork).toHaveBeenCalledWith('vw1', { part_id: 'p1' })
+})
+
+test('검토 의견을 불러와 작성자 이름과 함께 보여준다', async () => {
+  api.listComments.mockResolvedValue([
+    { id: 'c1', body: '표현이 좋아 후보로 적극 추천', created_by: 'm1', created_at: '2026-08-25T09:00:00Z' },
+  ])
+  render(<WorkDetailPanel volumeWork={VW} tasks={[]} members={MEMBERS} duplicates={[]} actions={makeActions()} onClose={() => {}} />)
+  expect(await screen.findByText(/후보로 적극 추천/)).toBeInTheDocument()
+  expect(screen.getByText(/김편집/)).toBeInTheDocument()
+})
+
+test('의견을 입력해 등록한다', async () => {
+  api.listComments.mockResolvedValue([])
+  api.addComment.mockResolvedValue({ id: 'c9', body: '분량 우려', created_by: 'm1', created_at: '2026-08-25T09:00:00Z' })
+  render(<WorkDetailPanel volumeWork={VW} tasks={[]} members={MEMBERS} duplicates={[]} actions={makeActions()} onClose={() => {}} />)
+  await userEvent.type(screen.getByPlaceholderText(/검토 의견/), '분량 우려')
+  await userEvent.click(screen.getByRole('button', { name: '의견 남기기' }))
+  expect(api.addComment).toHaveBeenCalledWith('vw1', '분량 우려')
+  expect(await screen.findByText('분량 우려')).toBeInTheDocument()
 })
