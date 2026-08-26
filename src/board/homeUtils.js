@@ -114,5 +114,11 @@ export function describeActivity(entry, nameOf) {
     if (a === 'insert') return `${name} 자료 '${d.name || ''}'을(를) 등록했습니다`
     if (a === 'delete') return `${name} 자료를 삭제했습니다`
   }
+  if (t === 'schedules') {
+    if (a === 'insert') return `${name} 일정 '${d.title || ''}'을(를) 등록했습니다`
+    if (a === 'delete') return `${name} 일정을 삭제했습니다`
+    if (a === 'update' && d.done?.[1] === true) return `${name} 일정을 완료 처리했습니다`
+    if (a === 'update') return `${name} 일정을 변경했습니다`
+  }
   return `${name} 항목을 변경했습니다`
 }

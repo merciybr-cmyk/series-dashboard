@@ -71,9 +71,11 @@ export default function SchedulePage() {
 
   async function handleCreate(e) {
     e.preventDefault()
+    const trimmedTitle = title.trim()
+    if (!trimmedTitle) return
     try {
       const created = await api.createSchedule({
-        title: title.trim(),
+        title: trimmedTitle,
         kind,
         due_date: selected,
         volume_id: volumeId || null,

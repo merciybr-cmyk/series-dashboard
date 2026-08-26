@@ -94,6 +94,16 @@ describe('describeActivity', () => {
     )).toBe('윤보라님이 업무를 완료했습니다')
     expect(describeActivity(
       { table_name: 'schedules', action: 'update', diff: null, actor_id: 'm1' }, nameOf,
-    )).toBe('윤보라님이 항목을 변경했습니다')
+    )).toBe('윤보라님이 일정을 변경했습니다')
+  })
+
+  test('일정 문구', () => {
+    const nameOf = () => '윤보라'
+    expect(describeActivity(
+      { table_name: 'schedules', action: 'insert', diff: { title: '편집회의' }, actor_id: 'm1' }, nameOf,
+    )).toBe("윤보라님이 일정 '편집회의'을(를) 등록했습니다")
+    expect(describeActivity(
+      { table_name: 'schedules', action: 'update', diff: { done: [false, true] }, actor_id: 'm1' }, nameOf,
+    )).toBe('윤보라님이 일정을 완료 처리했습니다')
   })
 })
