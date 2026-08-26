@@ -51,6 +51,17 @@ test('검색에서 추가하면 addPick이 호출되고 목록에 나타난다',
   await waitFor(() => expect(screen.getByRole('button', { name: '진달래꽃 제거' })).toBeInTheDocument())
 })
 
+test('추가하면 그 작품의 갈래 탭으로 전환되고 안내 토스트가 뜬다', async () => {
+  api.listPicks.mockResolvedValue([])
+  api.addPick.mockResolvedValue({ id: 'p9', work_id: 'W9', work_snapshot: { title: '춘향전', author: '미상', genre: '고전산문' } })
+  renderPage()
+  await waitFor(() => screen.getAllByRole('button', { name: '추가' }))
+  // 기본 탭은 현대시 — 고전산문 작품을 추가하면 고전산문 탭으로 자동 전환돼 바로 보인다
+  await userEvent.click(screen.getAllByRole('button', { name: '추가' })[0])
+  await waitFor(() => expect(screen.getByRole('button', { name: '춘향전 제거' })).toBeInTheDocument())
+  expect(screen.getByText(/고전산문 후보에 추가했습니다/)).toBeInTheDocument()
+})
+
 test('후보 제거는 confirm 후 목록에서 사라진다', async () => {
   api.listPicks.mockResolvedValue([
     { id: 'p1', work_id: 'W1', work_snapshot: { title: '진달래꽃', author: '김소월', genre: '시' } },

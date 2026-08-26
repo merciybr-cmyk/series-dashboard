@@ -16,10 +16,10 @@ export default function AppLayout() {
     <div className="min-h-screen">
       <header className="flex items-center gap-6 border-b border-blue-100 bg-blue-50 px-6 py-3">
         <span className="flex items-center gap-2.5">
-          <img src={`${import.meta.env.BASE_URL}mirae-n_logo.png`} alt="미래엔" className="h-5 w-auto shrink-0" />
-          <span className="font-bold">교과서 문학 단행본 시리즈 통합 관리</span>
+          <img src={`${import.meta.env.BASE_URL}mirae-n_logo.png`} alt="미래엔" className="h-6 w-auto shrink-0" />
+          <span className="text-xl font-bold">교과서 문학 단행본 시리즈 통합 관리</span>
         </span>
-        <nav className="flex gap-4 text-sm">
+        <nav className="flex gap-4 text-base">
           {MENU.map(m => (
             <NavLink
               key={m.to}

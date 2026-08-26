@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useWorksData } from '../works/useWorksData.js'
 import { buildRegistryMap, keyOf } from '../works/workKey.js'
 import * as api from './volumeApi.js'
-import { GENRE_BUCKETS, groupPicksByBucket } from './genreUtils.js'
+import { GENRE_BUCKETS, groupPicksByBucket, bucketOf } from './genreUtils.js'
 import { sortCurricula } from '../works/workKey.js'
 import { downloadBucketExcel, downloadAllExcel } from './exportPicks.js'
 import { SELECTION_LABELS } from './constants.js'
@@ -58,6 +58,10 @@ export default function GenrePicksPage() {
     try {
       const pick = await api.addPick({ work, curricula, registryMap })
       setPicks(ps => [...ps, pick])
+      // 추가된 작품의 갈래 탭으로 전환 — 다른 탭을 보고 있으면 방금 추가한 게 안 보여 실패로 오해된다
+      const bucket = bucketOf(pick.work_snapshot?.genre) || '기타'
+      setActiveBucket(bucket)
+      show(`「${pick.work_snapshot?.title}」을(를) ${bucket} 후보에 추가했습니다`)
       api.listRegistry().then(setRegistry).catch(() => {}) // 신규 work_id만 반영 (picks 재조회는 로컬 추가를 덮어쓰는 경합이 됨)
     } catch (err) {
       show(err.message)
@@ -118,13 +122,18 @@ export default function GenrePicksPage() {
         </div>
 
         <div className="min-w-0 flex-1 rounded border border-gray-200 p-3">
-          <div className="mb-2 flex flex-wrap gap-1">
+          <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-gray-100 pb-3">
+            <span className="text-sm font-medium text-gray-500">갈래 선택</span>
             {bucketTabs.map(b => (
               <button
                 key={b}
                 type="button"
                 onClick={() => setActiveBucket(b)}
-                className={`rounded px-2 py-1 text-sm ${activeBucket === b ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                className={`rounded-full border px-4 py-1.5 text-[15px] ${
+                  activeBucket === b
+                    ? 'border-blue-600 bg-blue-600 font-semibold text-white'
+                    : 'border-gray-300 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50'
+                }`}
               >
                 {b} {groups[b]?.length ? `(${groups[b].length})` : ''}
               </button>
