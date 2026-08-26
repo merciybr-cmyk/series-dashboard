@@ -240,6 +240,28 @@ export async function getFileUrl(storagePath, downloadName) {
   return data.signedUrl
 }
 
+// ---------- genre_picks (갈래별 후보 — 권 배치 전 롱리스트) ----------
+
+export async function listPicks() {
+  return unwrap(await supabase.from('genre_picks').select('*').order('created_at'))
+}
+
+export async function addPick({ work, curricula, registryMap }) {
+  const workId = await ensureWorkId(work, curricula, registryMap)
+  const { data, error } = await supabase.from('genre_picks')
+    .insert({ work_id: workId, work_snapshot: snapshotOf(work, curricula) })
+    .select().single()
+  if (error) {
+    if (error.code === '23505') throw new Error('이미 후보 목록에 있는 작품입니다')
+    throw new Error(error.message)
+  }
+  return data
+}
+
+export async function deletePick(id) {
+  unwrap(await supabase.from('genre_picks').delete().eq('id', id))
+}
+
 // ---------- 기타 ----------
 
 export async function listMembers() {

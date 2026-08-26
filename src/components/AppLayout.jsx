@@ -3,6 +3,7 @@ import { useAuth } from '../auth/AuthProvider.jsx'
 
 const MENU = [
   { to: '/', label: '홈' },
+  { to: '/picks', label: '갈래별 후보' },
   { to: '/volumes', label: '권별 작품 목록' },
   { to: '/compare', label: '권별 비교' },
   { to: '/schedule', label: '일정' },

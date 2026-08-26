@@ -9,6 +9,7 @@ import HomePage from './pages/HomePage.jsx'
 import VolumesPage from './board/VolumesPage.jsx'
 import VolumeBoardPage from './board/VolumeBoardPage.jsx'
 import ComparePage from './board/ComparePage.jsx'
+import GenrePicksPage from './board/GenrePicksPage.jsx'
 
 function Placeholder({ name }) {
   return <p className="text-gray-500">{name} — 이후 단계에서 구현됩니다.</p>
@@ -39,6 +40,7 @@ export default function App() {
               }
             >
               <Route path="/" element={<HomePage />} />
+              <Route path="/picks" element={<GenrePicksPage />} />
               <Route path="/volumes" element={<VolumesPage />} />
               <Route path="/volumes/:id" element={<VolumeBoardPage />} />
               <Route path="/compare" element={<ComparePage />} />
