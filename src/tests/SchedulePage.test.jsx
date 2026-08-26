@@ -59,3 +59,36 @@ test('완료 체크와 삭제가 동작한다', async () => {
   expect(api.deleteSchedule).toHaveBeenCalledWith('s1')
   window.confirm.mockRestore()
 })
+
+test('일정을 수정하면 updateSchedule이 호출되고 목록이 갱신된다', async () => {
+  api.listSchedules.mockResolvedValue([
+    { id: 's1', title: '편집회의', kind: '회의', due_date: TODAY, volume_id: null, attendee_ids: [], done: false, color: null },
+  ])
+  api.updateSchedule.mockResolvedValue({
+    id: 's1', title: '기획회의', kind: '마감', due_date: TODAY, volume_id: null, attendee_ids: [], done: false, color: 'green',
+  })
+  renderPage()
+  await waitFor(() => screen.getByRole('button', { name: '편집회의 수정' }))
+  await userEvent.click(screen.getByRole('button', { name: '편집회의 수정' }))
+  const titleInput = screen.getByLabelText('일정 제목')
+  expect(titleInput).toHaveValue('편집회의')
+  await userEvent.clear(titleInput)
+  await userEvent.type(titleInput, '기획회의')
+  await userEvent.click(screen.getByLabelText('색상 초록'))
+  await userEvent.click(screen.getByRole('button', { name: '저장' }))
+  expect(api.updateSchedule).toHaveBeenCalledWith('s1', expect.objectContaining({
+    title: '기획회의', color: 'green', due_date: TODAY,
+  }))
+  await waitFor(() => expect(screen.getAllByText('기획회의').length).toBeGreaterThanOrEqual(1))
+})
+
+test('색상을 골라 등록하면 color가 함께 전달된다', async () => {
+  api.listSchedules.mockResolvedValue([])
+  api.createSchedule.mockResolvedValue({ id: 's9', title: '원고 마감', kind: '마감', due_date: TODAY, volume_id: null, attendee_ids: [], done: false, color: 'purple' })
+  renderPage()
+  await waitFor(() => screen.getByLabelText('일정 제목'))
+  await userEvent.type(screen.getByLabelText('일정 제목'), '원고 마감')
+  await userEvent.click(screen.getByLabelText('색상 보라'))
+  await userEvent.click(screen.getByRole('button', { name: '일정 등록' }))
+  expect(api.createSchedule).toHaveBeenCalledWith(expect.objectContaining({ color: 'purple' }))
+})

@@ -298,10 +298,10 @@ export async function listSchedules() {
   return unwrap(await supabase.from('schedules').select('*').order('due_date'))
 }
 
-export async function createSchedule({ title, kind, due_date, volume_id = null, attendee_ids = [] }) {
+export async function createSchedule({ title, kind, due_date, volume_id = null, attendee_ids = [], color = null }) {
   return unwrap(
     await supabase.from('schedules')
-      .insert({ title, kind, due_date, volume_id, attendee_ids })
+      .insert({ title, kind, due_date, volume_id, attendee_ids, color })
       .select().single(),
   )
 }
