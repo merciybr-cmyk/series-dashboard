@@ -7,6 +7,7 @@ import { useToast } from '../components/Toast.jsx'
 
 // 계정 무관 주소(/u/N/ 제외) — 접속자 권한이 있는 구글 계정으로 열린다
 const DRIVE_URL = 'https://drive.google.com/drive/folders/1Zd7GqScK2Umcgjr14ZxHMq47g_4J5RI5'
+const WORKS_DB_URL = 'https://merciybr-cmyk.github.io/literature-db/'
 
 // 브라우저가 자체 렌더링할 수 있는 형식만 패널 미리보기
 const PREVIEWABLE = new Set(['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'txt'])
@@ -117,20 +118,35 @@ export default function LibraryPage() {
         </section>
 
         <section>
-          <h3 className="mb-2 font-semibold">자료 저장소</h3>
-          <a
-            href={DRIVE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 rounded border border-gray-200 px-4 py-3 text-sm hover:bg-gray-50"
-          >
-            <span className="text-xl">📁</span>
-            <span className="flex-1">
-              <span className="block font-medium text-blue-700">구글 드라이브 자료 폴더 열기</span>
-              <span className="block text-xs text-gray-500">원고·PDF 등 자료는 드라이브 폴더에서 관리합니다 (공통/권별은 폴더로 구분)</span>
-            </span>
-            <span aria-hidden className="text-gray-400">↗</span>
-          </a>
+          <h3 className="mb-2 font-semibold">바로가기</h3>
+          <div className="space-y-2">
+            <a
+              href={DRIVE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 rounded border border-gray-200 px-4 py-3 text-sm hover:bg-gray-50"
+            >
+              <span className="text-xl">📁</span>
+              <span className="flex-1">
+                <span className="block font-medium text-blue-700">구글 드라이브 자료 폴더 열기</span>
+                <span className="block text-xs text-gray-500">원고·PDF 등 자료는 드라이브 폴더에서 관리합니다 (공통/권별은 폴더로 구분)</span>
+              </span>
+              <span aria-hidden className="text-gray-400">↗</span>
+            </a>
+            <a
+              href={WORKS_DB_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 rounded border border-gray-200 px-4 py-3 text-sm hover:bg-gray-50"
+            >
+              <span className="text-xl">📚</span>
+              <span className="flex-1">
+                <span className="block font-medium text-blue-700">교과서 문학 작품 DB 열기</span>
+                <span className="block text-xs text-gray-500">역대 교과서 수록 작품 검색·조회 사이트</span>
+              </span>
+              <span aria-hidden className="text-gray-400">↗</span>
+            </a>
+          </div>
         </section>
       </div>
 

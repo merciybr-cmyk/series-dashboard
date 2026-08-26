@@ -24,7 +24,8 @@ export default function LoginPage() {
 
   return (
     <div className="mx-auto mt-24 max-w-sm rounded-lg border border-gray-200 p-8">
-      <h1 className="mb-1 text-xl font-bold">단행본 시리즈 대시보드</h1>
+      <img src={`${import.meta.env.BASE_URL}mirae-n_logo.png`} alt="미래엔" className="mb-4 h-6 w-auto" />
+      <h1 className="mb-1 text-xl font-bold">교과서 문학 단행본 시리즈 통합 관리</h1>
       <p className="mb-6 text-sm text-gray-500">초대받은 이메일로 로그인 링크를 보내드립니다.</p>
       {state === 'sent' ? (
         <p className="text-sm">
