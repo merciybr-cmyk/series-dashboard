@@ -134,3 +134,30 @@ test('uploadFile: 한글 파일명은 스토리지 키에서 ASCII로 치환된�
 test('addFileLink: http(s)가 아닌 URL은 거부한다', async () => {
   await expect(api.addFileLink('vw1', 'x', 'javascript:alert(1)')).rejects.toThrow('http')
 })
+
+test('일정·자료실 API가 존재한다', () => {
+  for (const fn of ['listSchedules', 'createSchedule', 'updateSchedule', 'deleteSchedule',
+    'listLibraryFiles', 'uploadLibraryFile', 'addLibraryLink']) {
+    expect(typeof api[fn]).toBe('function')
+  }
+})
+
+test('createSchedule: 기본값과 함께 insert한다', async () => {
+  fromResults.push({ data: { id: 's1', title: '3권 편집회의', kind: '회의' }, error: null })
+  const s = await api.createSchedule({ title: '3권 편집회의', kind: '회의', due_date: '2026-09-01', volume_id: null, attendee_ids: ['m1'] })
+  expect(s.kind).toBe('회의')
+  expect(mockSupabase.from).toHaveBeenCalledWith('schedules')
+})
+
+test('uploadLibraryFile: library/ 경로에 새니타이즈 키로 업로드한다', async () => {
+  const upload = vi.fn().mockResolvedValue({ error: null })
+  mockSupabase.storage = { from: vi.fn(() => ({ upload })) }
+  fromResults.push({ data: { id: 'f1', kind: 'upload', name: '회의록_0826.hwp' }, error: null })
+  const row = await api.uploadLibraryFile({ name: '회의록_0826.hwp', size: 100 }, null)
+  expect(row.kind).toBe('upload')
+  expect(upload.mock.calls[0][0]).toMatch(/^library\/\d+_[\w.-]+$/)
+})
+
+test('addLibraryLink: http(s) 외 스킴을 거부한다', async () => {
+  await expect(api.addLibraryLink('자료', 'ftp://x', null)).rejects.toThrow('http')
+})

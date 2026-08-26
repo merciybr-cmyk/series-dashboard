@@ -240,6 +240,36 @@ export async function getFileUrl(storagePath, downloadName) {
   return data.signedUrl
 }
 
+// 자료실: volume_work_id 없는 행. 회의록 등 소용량만 업로드, 대용량은 클라우드 링크 정책.
+export async function listLibraryFiles() {
+  return unwrap(
+    await supabase.from('files').select('*')
+      .is('volume_work_id', null)
+      .order('created_at', { ascending: false }),
+  )
+}
+
+export async function uploadLibraryFile(file, volumeId = null) {
+  const safeName = file.name.replace(/[^\w.-]+/g, '_')
+  const path = `library/${Date.now()}_${safeName}`
+  const { error } = await supabase.storage.from(BUCKET).upload(path, file)
+  if (error) throw new Error(error.message)
+  return unwrap(
+    await supabase.from('files')
+      .insert({ name: file.name, kind: 'upload', storage_path: path, volume_id: volumeId ?? null })
+      .select().single(),
+  )
+}
+
+export async function addLibraryLink(name, url, volumeId = null) {
+  if (!/^https?:\/\//i.test(url)) throw new Error('링크는 http:// 또는 https:// 로 시작해야 합니다')
+  return unwrap(
+    await supabase.from('files')
+      .insert({ name, kind: 'link', url, volume_id: volumeId ?? null })
+      .select().single(),
+  )
+}
+
 // ---------- genre_picks (갈래별 후보 — 권 배치 전 롱리스트) ----------
 
 export async function listPicks() {
@@ -260,6 +290,28 @@ export async function addPick({ work, curricula, registryMap }) {
 
 export async function deletePick(id) {
   unwrap(await supabase.from('genre_picks').delete().eq('id', id))
+}
+
+// ---------- schedules (일정 — 회의·마감, 2026-08-26 결정) ----------
+
+export async function listSchedules() {
+  return unwrap(await supabase.from('schedules').select('*').order('due_date'))
+}
+
+export async function createSchedule({ title, kind, due_date, volume_id = null, attendee_ids = [] }) {
+  return unwrap(
+    await supabase.from('schedules')
+      .insert({ title, kind, due_date, volume_id, attendee_ids })
+      .select().single(),
+  )
+}
+
+export async function updateSchedule(id, patch) {
+  return unwrap(await supabase.from('schedules').update(patch).eq('id', id).select().single())
+}
+
+export async function deleteSchedule(id) {
+  unwrap(await supabase.from('schedules').delete().eq('id', id))
 }
 
 // ---------- 기타 ----------
