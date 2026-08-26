@@ -87,7 +87,9 @@ export default function LibraryPage() {
       return
     }
     try {
-      const url = await getFileUrl(f.storage_path) // download 이름 없이 → 인라인 표시
+      let url = await getFileUrl(f.storage_path) // download 이름 없이 → 인라인 표시
+      // 브라우저 PDF 뷰어의 썸네일 사이드바·툴바를 숨기고 페이지 폭 맞춤
+      if (extOf(f.name) === 'pdf') url += '#toolbar=0&navpanes=0&view=FitH'
       setPreview({ file: f, url })
     } catch (err) {
       show(err.message)
@@ -96,7 +98,7 @@ export default function LibraryPage() {
 
   return (
     <div className="flex items-start gap-4">
-      <div className="min-w-0 max-w-3xl flex-1">
+      <div className={preview ? 'w-[26rem] shrink-0' : 'min-w-0 max-w-3xl flex-1'}>
         <h2 className="mb-1 text-lg font-bold">자료실</h2>
         <p className="mb-4 text-sm text-gray-500">
           서버 업로드는 회의록 등 소용량 파일만(50MB), 원고·PDF 등 대용량 자료는 드라이브 링크로 등록해 주세요.
@@ -164,7 +166,7 @@ export default function LibraryPage() {
       </div>
 
       {preview && (
-        <aside className="sticky top-6 flex h-[80vh] w-[32rem] shrink-0 flex-col rounded border border-gray-200 bg-white">
+        <aside className="sticky top-4 flex h-[calc(100vh-6.5rem)] min-w-0 flex-1 flex-col rounded border border-gray-200 bg-white">
           <div className="flex items-center gap-2 border-b border-gray-200 px-3 py-2">
             <span className="min-w-0 flex-1 truncate text-sm font-medium">{preview.file.name}</span>
             <button type="button" aria-label="미리보기 다운로드" onClick={() => handleDownload(preview.file)}

@@ -42,7 +42,8 @@ test('미리보기를 누르면 오른쪽 패널에 표시된다 (PDF → iframe
   await userEvent.click(screen.getByRole('button', { name: '8월 회의록.pdf 미리보기' }))
   expect(api.getFileUrl).toHaveBeenCalledWith('library/x') // 인라인용 — 다운로드 이름 없이
   const frame = await screen.findByTitle('8월 회의록.pdf 미리보기')
-  expect(frame).toHaveAttribute('src', 'https://signed.example.com/x.pdf')
+  // PDF는 썸네일 사이드바·툴바 숨김 + 페이지 폭 맞춤 프래그먼트를 붙인다
+  expect(frame).toHaveAttribute('src', 'https://signed.example.com/x.pdf#toolbar=0&navpanes=0&view=FitH')
   // 닫기
   await userEvent.click(screen.getByRole('button', { name: '미리보기 닫기' }))
   expect(screen.queryByTitle('8월 회의록.pdf 미리보기')).not.toBeInTheDocument()
