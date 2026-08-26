@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { HashRouter } from 'react-router-dom'
 import { vi } from 'vitest'
 
@@ -12,6 +12,7 @@ vi.mock('../board/volumeApi.js', () => ({
   listAllFiles: vi.fn(),
   listActivity: vi.fn(),
   listMembers: vi.fn(),
+  listSchedules: vi.fn().mockResolvedValue([]),
   subscribeBoard: vi.fn(() => () => {}),
 }))
 const api = await import('../board/volumeApi.js')
@@ -32,13 +33,14 @@ function futureDateStr(daysAhead) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-function setup({ tasks = [], vworks = [VWROW], files = [], activity = [] } = {}) {
+function setup({ tasks = [], vworks = [VWROW], files = [], activity = [], schedules = [] } = {}) {
   api.listVolumes.mockResolvedValue([{ id: 'v1', number: 1, title: '삶', status: '선정중' }])
   api.listAllVolumeWorks.mockResolvedValue(vworks)
   api.listAllTasks.mockResolvedValue(tasks)
   api.listAllFiles.mockResolvedValue(files)
   api.listActivity.mockResolvedValue(activity)
   api.listMembers.mockResolvedValue([{ id: 'm1', name: '윤보라' }])
+  api.listSchedules.mockResolvedValue(schedules)
   return render(<ToastProvider><HashRouter><HomePage /></HashRouter></ToastProvider>)
 }
 
@@ -73,4 +75,18 @@ test('권별 진행 현황과 최근 활동 문구가 나온다', async () => {
 test('할 일이 없으면 빈 안내가 나온다', async () => {
   setup({ vworks: [] })
   await waitFor(() => expect(screen.getByText(/오늘 처리할 업무가 없습니다/)).toBeInTheDocument())
+})
+
+test('확인 대상자인 일정이 내 할 일에 📅로 뜬다', async () => {
+  setup({
+    schedules: [
+      { id: 's1', title: '편집회의', kind: '회의', due_date: futureDateStr(3), volume_id: null, attendee_ids: ['m1'], done: false },
+      { id: 's2', title: '남의 회의', kind: '회의', due_date: futureDateStr(3), volume_id: null, attendee_ids: ['m2'], done: false },
+    ],
+  })
+  await waitFor(() => expect(screen.getByText('내 할 일')).toBeInTheDocument())
+  const myCard = screen.getByText('내 할 일').closest('section')
+  await waitFor(() => expect(within(myCard).getByText(/📅 회의 · 편집회의/)).toBeInTheDocument())
+  expect(screen.queryAllByText(/남의 회의/).length).toBeGreaterThan(0) // 다가오는 마감에는 전체 표시
+  expect(within(myCard).queryByText(/남의 회의/)).not.toBeInTheDocument()
 })

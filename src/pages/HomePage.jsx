@@ -22,6 +22,28 @@ function taskLink(t) {
   return `/volumes/${t.volume_works?.volume_id}?vw=${t.volume_works?.id}`
 }
 
+function toTaskItem(t) {
+  return { kind: 'task', id: 't' + t.id, due_date: t.due_date, payload: t }
+}
+
+function toScheduleItem(s) {
+  return { kind: 'schedule', id: 's' + s.id, due_date: s.due_date, payload: s }
+}
+
+function itemLink(item) {
+  return item.kind === 'task' ? taskLink(item.payload) : '/schedule'
+}
+
+function itemLabel(item, volumes) {
+  if (item.kind === 'task') {
+    const t = item.payload
+    return `${t.volume_works?.volumes?.number}권 · 「${t.volume_works?.work_snapshot?.title}」 ${t.title}`
+  }
+  const s = item.payload
+  const vol = volumes.find(v => v.id === s.volume_id)
+  return `${vol ? `${vol.number}권 · ` : ''}📅 ${s.kind} · ${s.title}`
+}
+
 export default function HomePage() {
   const { member } = useAuth()
   const { show } = useToast()
@@ -30,11 +52,11 @@ export default function HomePage() {
 
   const load = useCallback(async () => {
     try {
-      const [volumes, vworks, tasks, files, activity, members] = await Promise.all([
+      const [volumes, vworks, tasks, files, activity, members, schedules] = await Promise.all([
         api.listVolumes(), api.listAllVolumeWorks(), api.listAllTasks(),
-        api.listAllFiles(), api.listActivity(20), api.listMembers(),
+        api.listAllFiles(), api.listActivity(20), api.listMembers(), api.listSchedules(),
       ])
-      setData({ volumes, vworks, tasks, files, activity, members })
+      setData({ volumes, vworks, tasks, files, activity, members, schedules })
     } catch (err) {
       show(err.message)
     }
@@ -52,9 +74,11 @@ export default function HomePage() {
   const computed = useMemo(() => {
     if (!data) return null
     const nameOf = id => data.members.find(m => m.id === id)?.name
-    const myTasks = sortMyTasks(
-      data.tasks.filter(t => t.assignee_id === member?.id && t.status !== 'done'),
-    )
+    const mySchedules = data.schedules.filter(s => !s.done && (s.attendee_ids || []).includes(member?.id))
+    const myTasks = sortMyTasks([
+      ...data.tasks.filter(t => t.assignee_id === member?.id && t.status !== 'done').map(toTaskItem),
+      ...mySchedules.map(toScheduleItem),
+    ])
     const tasksByVw = {}
     for (const t of data.tasks) {
       const vwId = t.volume_works?.id
@@ -62,8 +86,13 @@ export default function HomePage() {
     }
     const fileVwIds = new Set(data.files.map(f => f.volume_work_id))
     const attention = buildAttention(data.vworks, tasksByVw, fileVwIds)
-    const upcoming = data.tasks
+    const upcomingTasks = data.tasks
       .filter(t => t.status !== 'done' && t.due_date && daysUntil(t.due_date) >= 0 && daysUntil(t.due_date) <= 7)
+      .map(toTaskItem)
+    const upcomingSchedules = data.schedules
+      .filter(s => !s.done && s.due_date && daysUntil(s.due_date) >= 0 && daysUntil(s.due_date) <= 7)
+      .map(toScheduleItem)
+    const upcoming = [...upcomingTasks, ...upcomingSchedules]
       .sort((a, b) => a.due_date.localeCompare(b.due_date))
     const progress = volumeProgress(data.volumes, data.vworks, data.tasks)
     const feed = data.activity.map(e => ({
@@ -82,16 +111,16 @@ export default function HomePage() {
       <div className="grid gap-4 md:grid-cols-2">
         <Card title="내 할 일">
           <ul className="space-y-1.5">
-            {myTasks.map(t => (
-              <li key={t.id}>
-                <Link to={taskLink(t)} className="flex items-center gap-2 text-sm hover:underline">
-                  <span>{urgencyIcon(taskUrgency(t.due_date))}</span>
+            {myTasks.map(item => (
+              <li key={item.id}>
+                <Link to={itemLink(item)} className="flex items-center gap-2 text-sm hover:underline">
+                  <span>{urgencyIcon(taskUrgency(item.due_date))}</span>
                   <span className="min-w-0 flex-1 truncate">
-                    {t.volume_works?.volumes?.number}권 · 「{t.volume_works?.work_snapshot?.title}」 {t.title}
+                    {itemLabel(item, data.volumes)}
                   </span>
-                  {t.due_date && (
-                    <span className={`shrink-0 text-xs ${daysUntil(t.due_date) < 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                      {dDayLabel(daysUntil(t.due_date))}
+                  {item.due_date && (
+                    <span className={`shrink-0 text-xs ${daysUntil(item.due_date) < 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                      {dDayLabel(daysUntil(item.due_date))}
                     </span>
                   )}
                 </Link>
@@ -118,11 +147,11 @@ export default function HomePage() {
 
       <Card title="다가오는 마감 (7일)">
         <ul className="space-y-1 text-sm">
-          {upcoming.slice(0, 10).map(t => (
-            <li key={t.id} className="flex items-center gap-2">
-              <span className="w-14 shrink-0 text-xs text-gray-400">{dDayLabel(daysUntil(t.due_date))}</span>
-              <Link to={taskLink(t)} className="min-w-0 flex-1 truncate hover:underline">
-                {t.volume_works?.volumes?.number}권 · 「{t.volume_works?.work_snapshot?.title}」 {t.title}
+          {upcoming.slice(0, 10).map(item => (
+            <li key={item.id} className="flex items-center gap-2">
+              <span className="w-14 shrink-0 text-xs text-gray-400">{dDayLabel(daysUntil(item.due_date))}</span>
+              <Link to={itemLink(item)} className="min-w-0 flex-1 truncate hover:underline">
+                {itemLabel(item, data.volumes)}
               </Link>
             </li>
           ))}
