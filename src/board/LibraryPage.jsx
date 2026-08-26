@@ -6,7 +6,8 @@ import { listLibraryFiles, uploadLibraryFile, deleteFile, getFileUrl, listMember
 import { useToast } from '../components/Toast.jsx'
 
 // 계정 무관 주소(/u/N/ 제외) — 접속자 권한이 있는 구글 계정으로 열린다
-const DRIVE_URL = 'https://drive.google.com/drive/folders/1Zd7GqScK2Umcgjr14ZxHMq47g_4J5RI5'
+const DRIVE_REF_URL = 'https://drive.google.com/drive/folders/18je1FtxZURnp8AN22tO2Bjk3hHfC4ljn'
+const DRIVE_MANUSCRIPT_URL = 'https://drive.google.com/drive/folders/1ksWD3v9aeOA-FpTTNf2FK-qIhQKjkP2i'
 const WORKS_DB_URL = 'https://merciybr-cmyk.github.io/literature-db/'
 
 // 브라우저가 자체 렌더링할 수 있는 형식만 패널 미리보기
@@ -121,15 +122,28 @@ export default function LibraryPage() {
           <h3 className="mb-2 font-semibold">바로가기</h3>
           <div className="space-y-2">
             <a
-              href={DRIVE_URL}
+              href={DRIVE_REF_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-3 rounded border border-gray-200 px-4 py-3 text-sm hover:bg-gray-50"
             >
               <span className="text-xl">📁</span>
               <span className="flex-1">
-                <span className="block font-medium text-blue-700">구글 드라이브 자료 폴더 열기</span>
-                <span className="block text-xs text-gray-500">원고·PDF 등 자료는 드라이브 폴더에서 관리합니다 (공통/권별은 폴더로 구분)</span>
+                <span className="block font-medium text-blue-700">참고 자료 폴더 열기</span>
+                <span className="block text-xs text-gray-500">회의 자료·PDF 등 참고 자료 (구글 드라이브)</span>
+              </span>
+              <span aria-hidden className="text-gray-400">↗</span>
+            </a>
+            <a
+              href={DRIVE_MANUSCRIPT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 rounded border border-gray-200 px-4 py-3 text-sm hover:bg-gray-50"
+            >
+              <span className="text-xl">📝</span>
+              <span className="flex-1">
+                <span className="block font-medium text-blue-700">원고 업로드 폴더 열기</span>
+                <span className="block text-xs text-gray-500">작성한 원고는 이 폴더에 올려 주세요 (구글 드라이브)</span>
               </span>
               <span aria-hidden className="text-gray-400">↗</span>
             </a>
