@@ -77,7 +77,7 @@ export default function GenrePicksPage() {
   const activePicks = groups[activeBucket] || []
 
   return (
-    <div className="flex h-[calc(100vh-7rem)] flex-col">
+    <div>
       <div className="mb-3 flex items-center gap-3">
         <h2 className="text-lg font-bold">갈래별 후보</h2>
         <span className="text-sm text-gray-400">
@@ -85,8 +85,8 @@ export default function GenrePicksPage() {
         </span>
       </div>
 
-      <div className="flex min-h-0 flex-1 gap-4">
-        <div className="w-96 shrink-0 rounded border border-gray-200 p-3">
+      <div className="flex items-start gap-4">
+        <div className="sticky top-6 h-[80vh] w-96 shrink-0 rounded border border-gray-200 p-3">
           {sheetLoading ? (
             <p className="text-sm text-gray-400">작품 데이터 불러오는 중…</p>
           ) : sheetError ? (
@@ -113,15 +113,17 @@ export default function GenrePicksPage() {
             ))}
           </div>
 
-          <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
+          <ul className="space-y-1">
             {activePicks.map(p => {
               const dups = duplicatesByWorkId.get(p.work_id) || []
               return (
                 <li key={p.id} className="flex items-center gap-2 rounded border border-gray-100 px-3 py-2 text-sm">
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium">{p.work_snapshot?.title}</div>
-                    <div className="truncate text-xs text-gray-500">
-                      {p.work_snapshot?.author} · {p.work_snapshot?.genre}
+                    <div className="truncate">
+                      <span className="font-medium">{p.work_snapshot?.title}</span>
+                      <span className="ml-2 text-xs text-gray-500">
+                        {p.work_snapshot?.author} · {p.work_snapshot?.genre}
+                      </span>
                     </div>
                     {(p.work_snapshot?.curriculum || []).length > 0 && (
                       <div className="truncate text-xs text-gray-400" title={p.work_snapshot.curriculum.join(', ')}>
