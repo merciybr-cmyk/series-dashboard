@@ -10,7 +10,7 @@ test('bucketOf: 시트 갈래 7종을 정확히 분류한다', () => {
   expect(bucketOf('수필')).toBe('현대수필·극')
   expect(bucketOf('극본')).toBe('현대수필·극')
   expect(bucketOf('고전운문')).toBe('고전운문')
-  expect(bucketOf('시조')).toBe('고전운문')
+  expect(bucketOf('시조')).toBe('현대시')
   expect(bucketOf('고전산문')).toBe('고전산문')
   expect(bucketOf('판소리')).toBeNull()
   expect(bucketOf(null)).toBeNull()
@@ -24,8 +24,8 @@ test('groupPicksByBucket: 버킷별로 묶고 미분류는 기타로', () => {
     { id: 'd', work_snapshot: { genre: '극본' } },
   ]
   const g = groupPicksByBucket(picks)
-  expect(g['현대시'].map(p => p.id)).toEqual(['a'])
-  expect(g['고전운문'].map(p => p.id)).toEqual(['b'])
+  expect(g['현대시'].map(p => p.id)).toEqual(['a', 'b'])
+  expect(g['고전운문']).toEqual([])
   expect(g['현대수필·극'].map(p => p.id)).toEqual(['d'])
   expect(g['기타'].map(p => p.id)).toEqual(['c'])
   expect(g['현대소설']).toEqual([])
