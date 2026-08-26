@@ -25,7 +25,7 @@ function renderPage() {
 
 test('후보를 갈래 탭으로 분류해 보여준다', async () => {
   api.listPicks.mockResolvedValue([
-    { id: 'p1', work_id: 'W1', work_snapshot: { title: '진달래꽃', author: '김소월', genre: '시' } },
+    { id: 'p1', work_id: 'W1', work_snapshot: { title: '진달래꽃', author: '김소월', genre: '시', curriculum: ['7차', '2015개정'] } },
     { id: 'p2', work_id: 'W2', work_snapshot: { title: '춘향전', author: '미상', genre: '고전산문' } },
   ])
   renderPage()
@@ -34,6 +34,8 @@ test('후보를 갈래 탭으로 분류해 보여준다', async () => {
   // 기본 탭(현대시)의 후보가 보인다 — 후보 행 고유 요소(제거 버튼)로 확인 (검색 패널과 작품명 중복 방지)
   expect(screen.getByRole('button', { name: '진달래꽃 제거' })).toBeInTheDocument()
   expect(screen.queryByText('춘향전')).not.toBeInTheDocument()
+  // 수록 교육과정 표시
+  expect(screen.getByText('7차 · 2015개정')).toBeInTheDocument()
   // 탭 전환
   await userEvent.click(screen.getByRole('button', { name: /고전산문/ }))
   expect(screen.getByText('춘향전')).toBeInTheDocument()

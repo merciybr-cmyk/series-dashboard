@@ -123,6 +123,11 @@ export default function GenrePicksPage() {
                     <div className="truncate text-xs text-gray-500">
                       {p.work_snapshot?.author} · {p.work_snapshot?.genre}
                     </div>
+                    {(p.work_snapshot?.curriculum || []).length > 0 && (
+                      <div className="truncate text-xs text-gray-400" title={p.work_snapshot.curriculum.join(', ')}>
+                        {p.work_snapshot.curriculum.join(' · ')}
+                      </div>
+                    )}
                   </div>
                   {dups.map((d, i) => (
                     <span
