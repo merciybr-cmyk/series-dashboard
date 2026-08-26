@@ -69,3 +69,12 @@ test("'수록 많은 순'을 켜면 횟수 내림차순으로 정렬된다", asy
   await userEvent.click(screen.getByLabelText('수록 많은 순'))
   expect(firstTitle()).toContain('별 헤는 밤')
 })
+
+test("pickKeys가 있으면 '갈래 후보만'이 기본 적용되고 해제 시 전체가 보인다", async () => {
+  const pickKeys = new Set([workKeyOf(WORKS[0])]) // 소나기만 후보
+  render(<SearchPane works={WORKS} duplicatesByKey={new Map()} onAdd={() => {}} pickKeys={pickKeys} />)
+  expect(screen.getAllByRole('button', { name: '추가' })).toHaveLength(1)
+  expect(screen.queryByText('별 헤는 밤')).not.toBeInTheDocument()
+  await userEvent.click(screen.getByLabelText('갈래 후보만'))
+  expect(screen.getAllByRole('button', { name: '추가' })).toHaveLength(2)
+})

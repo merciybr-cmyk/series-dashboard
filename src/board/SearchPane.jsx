@@ -7,11 +7,13 @@ import MultiSelectDropdown from './MultiSelectDropdown.jsx'
 
 const MAX_SHOWN = 50
 
-export default function SearchPane({ works, duplicatesByKey, onAdd }) {
+// pickKeys(Set)가 주어지면 "갈래 후보만" 토글이 나타나고 기본 ON — 후보 풀에서만 검색 (2026-08-26)
+export default function SearchPane({ works, duplicatesByKey, onAdd, pickKeys = null }) {
   const [query, setQuery] = useState('')
   const [curriculum, setCurriculum] = useState([])
   const [genre, setGenre] = useState([])
   const [sortByCount, setSortByCount] = useState(false)
+  const [onlyPicks, setOnlyPicks] = useState(true)
 
   const curriculumOptions = useMemo(() => sortCurricula(getUniqueValues(works, '교육과정')), [works])
   const genreOptions = useMemo(() => getUniqueValues(works, '장르'), [works])
@@ -34,12 +36,15 @@ export default function SearchPane({ works, duplicatesByKey, onAdd }) {
       const key = workKeyOf(w)
       if (!map.has(key)) map.set(key, { rep: w })
     }
-    const entries = [...map.entries()] // [key, {rep}]
+    let entries = [...map.entries()] // [key, {rep}]
+    if (pickKeys && onlyPicks) {
+      entries = entries.filter(([key]) => pickKeys.has(key))
+    }
     if (sortByCount) {
       entries.sort((a, b) => (countsByKey.get(b[0]) || 0) - (countsByKey.get(a[0]) || 0))
     }
     return entries
-  }, [works, curriculum, genre, query, sortByCount, countsByKey])
+  }, [works, curriculum, genre, query, sortByCount, countsByKey, pickKeys, onlyPicks])
 
   return (
     <div className="flex h-full flex-col">
@@ -56,7 +61,13 @@ export default function SearchPane({ works, duplicatesByKey, onAdd }) {
 
       <div className="mb-1 flex items-center gap-3">
         <p className="text-xs text-gray-400">작품 {grouped.length}건{grouped.length > MAX_SHOWN ? ` (상위 ${MAX_SHOWN}건 표시)` : ''}</p>
-        <label className="ml-auto flex items-center gap-1 text-xs text-gray-500">
+        {pickKeys && (
+          <label className="ml-auto flex items-center gap-1 text-xs text-gray-500">
+            <input type="checkbox" checked={onlyPicks} onChange={e => setOnlyPicks(e.target.checked)} />
+            갈래 후보만
+          </label>
+        )}
+        <label className={`flex items-center gap-1 text-xs text-gray-500 ${pickKeys ? '' : 'ml-auto'}`}>
           <input type="checkbox" checked={sortByCount} onChange={e => setSortByCount(e.target.checked)} />
           수록 많은 순
         </label>

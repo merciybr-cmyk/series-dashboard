@@ -24,6 +24,7 @@ export default function VolumeBoardPage() {
   const [registry, setRegistry] = useState([])
   const [allVw, setAllVw] = useState([])
   const [allFiles, setAllFiles] = useState([])
+  const [picks, setPicks] = useState([])
   const [selectedId, setSelectedId] = useState(null)
   const [activePart, setActivePart] = useState('all')
 
@@ -43,12 +44,28 @@ export default function VolumeBoardPage() {
     api.listRegistry().then(setRegistry).catch(() => {})
     api.listAllVolumeWorks().then(setAllVw).catch(() => {})
     api.listAllFiles().then(setAllFiles).catch(() => {})
+    api.listPicks().then(setPicks).catch(() => {})
   }, [])
   useEffect(loadDupData, [loadDupData, board.works])
 
   const registryMap = useMemo(() => buildRegistryMap(registry), [registry])
 
   const hasFiles = useMemo(() => new Set(allFiles.map(f => f.volume_work_id)), [allFiles])
+
+  // 갈래별 후보의 시트 키 집합 (registry 경유, 별칭 포함) — 검색 "갈래 후보만" 필터용
+  const pickKeys = useMemo(() => {
+    if (!picks.length) return new Set()
+    const keysById = new Map()
+    for (const row of registry) {
+      keysById.set(row.work_id, [
+        keyOf(row.title, row.author_base),
+        ...(row.aliases || []).map(a => keyOf(a.title, a.author_base)),
+      ])
+    }
+    const s = new Set()
+    for (const p of picks) for (const k of keysById.get(p.work_id) || []) s.add(k)
+    return s
+  }, [picks, registry])
 
   // work_id → 수록처 목록, 그리고 시트 키 → 수록처 목록 (registry 경유)
   const duplicatesByWorkId = useMemo(() => {
@@ -143,7 +160,7 @@ export default function VolumeBoardPage() {
               <button type="button" onClick={retry} className="rounded border px-3 py-1">다시 시도</button>
             </div>
           ) : (
-            <SearchPane works={sheetWorks} duplicatesByKey={duplicatesByKey} onAdd={handleAdd} />
+            <SearchPane works={sheetWorks} duplicatesByKey={duplicatesByKey} onAdd={handleAdd} pickKeys={pickKeys} />
           )}
         </div>
 

@@ -17,6 +17,7 @@ vi.mock('../board/volumeApi.js', () => ({
   listRegistry: vi.fn().mockResolvedValue([]),
   listAllVolumeWorks: vi.fn().mockResolvedValue([]),
   listAllFiles: vi.fn().mockResolvedValue([]),
+  listPicks: vi.fn().mockResolvedValue([]),
   subscribeBoard: vi.fn(() => () => {}),
   updateVolume: vi.fn(),
   addWorkToVolume: vi.fn(), updateVolumeWork: vi.fn(), deleteVolumeWork: vi.fn(),
