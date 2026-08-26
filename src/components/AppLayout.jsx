@@ -8,7 +8,6 @@ const MENU = [
   { to: '/compare', label: '권별 비교' },
   { to: '/schedule', label: '일정' },
   { to: '/library', label: '자료실' },
-  { to: '/contacts', label: '연락처' },
 ]
 
 export default function AppLayout() {
