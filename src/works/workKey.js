@@ -25,12 +25,25 @@ export function buildRegistryMap(registryRows) {
   return map
 }
 
+// 교육과정 정렬: 1차~7차 → 2007개정 → 2009개정 → 2015개정 → 2022개정 (2026-08-26 사용자 결정)
+export function curriculumRank(c) {
+  const cha = /^(\d+)차$/.exec(c)
+  if (cha) return Number(cha[1])
+  const rev = /^(\d{4})(개정)?$/.exec(c)
+  if (rev) return 100 + Number(rev[1]) - 2000
+  return 1000 // 미지의 값은 맨 뒤
+}
+
+export function sortCurricula(list) {
+  return [...list].sort((a, b) => curriculumRank(a) - curriculumRank(b) || a.localeCompare(b))
+}
+
 export function curriculaOf(works, key) {
   const set = new Set()
   for (const w of works) {
     if (workKeyOf(w) === key && w['교육과정']) set.add(w['교육과정'])
   }
-  return [...set].sort()
+  return sortCurricula([...set])
 }
 
 export function snapshotOf(work, curricula = []) {

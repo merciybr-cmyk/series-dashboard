@@ -4,6 +4,8 @@ import { useWorksData } from '../works/useWorksData.js'
 import { buildRegistryMap, keyOf } from '../works/workKey.js'
 import * as api from './volumeApi.js'
 import { GENRE_BUCKETS, groupPicksByBucket } from './genreUtils.js'
+import { sortCurricula } from '../works/workKey.js'
+import { downloadBucketExcel, downloadAllExcel } from './exportPicks.js'
 import { SELECTION_LABELS } from './constants.js'
 import SearchPane from './SearchPane.jsx'
 import { useToast } from '../components/Toast.jsx'
@@ -83,6 +85,22 @@ export default function GenrePicksPage() {
         <span className="text-sm text-gray-400">
           권 배치 전에 갈래별로 수록할 만한 작품을 먼저 모아 두는 곳입니다 · 전체 {picks.length}편
         </span>
+        <div className="ml-auto flex gap-2">
+          <button
+            type="button"
+            onClick={() => (activePicks.length ? downloadBucketExcel(activePicks, activeBucket) : show('현재 갈래에 후보가 없습니다'))}
+            className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-600 hover:bg-gray-50"
+          >
+            현재 갈래 엑셀
+          </button>
+          <button
+            type="button"
+            onClick={() => (picks.length ? downloadAllExcel(picks) : show('내보낼 후보가 없습니다'))}
+            className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-600 hover:bg-gray-50"
+          >
+            전체 엑셀 (갈래별 시트)
+          </button>
+        </div>
       </div>
 
       <div className="flex items-start gap-4">
@@ -126,8 +144,8 @@ export default function GenrePicksPage() {
                       </span>
                     </div>
                     {(p.work_snapshot?.curriculum || []).length > 0 && (
-                      <div className="truncate text-xs text-gray-400" title={p.work_snapshot.curriculum.join(', ')}>
-                        {p.work_snapshot.curriculum.join(' · ')}
+                      <div className="truncate text-xs text-gray-400" title={sortCurricula(p.work_snapshot.curriculum).join(', ')}>
+                        {sortCurricula(p.work_snapshot.curriculum).join(' · ')}
                       </div>
                     )}
                   </div>

@@ -4,6 +4,7 @@ import { SELECTION_LABELS, TASK_PRESETS } from './constants.js'
 import { tasksProgress, daysUntil, dDayLabel, partLabel } from './boardUtils.js'
 import { listActivityFor, listComments, addComment, deleteComment, listFiles, uploadFile, addFileLink, deleteFile, getFileUrl } from './volumeApi.js'
 import { useToast } from '../components/Toast.jsx'
+import { sortCurricula } from '../works/workKey.js'
 
 function Section({ title, children }) {
   return (
@@ -147,7 +148,7 @@ export default function WorkDetailPanel({ volumeWork: vw, tasks, members, duplic
         <div className="flex-1">
           <h3 className="text-lg font-bold">{snap.title}</h3>
           <p className="text-sm text-gray-500">{snap.author} · {snap.genre}</p>
-          <p className="text-xs text-gray-400">교육과정: {(snap.curriculum || []).join(', ') || '-'}</p>
+          <p className="text-xs text-gray-400">교육과정: {sortCurricula(snap.curriculum || []).join(', ') || '-'}</p>
           {duplicates.length > 0 && (
             <p className="mt-1 text-xs text-amber-700">
               다른 권 수록: {duplicates.map(d => `${d.volumeNumber}권(${SELECTION_LABELS[d.selection_status]})`).join(', ')}

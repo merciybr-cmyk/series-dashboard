@@ -19,7 +19,7 @@ test('작품 단위로 묶어 보여주고, 추가 시 대표 행과 교육과�
   await userEvent.click(screen.getAllByRole('button', { name: '추가' })[0])
   expect(onAdd).toHaveBeenCalledWith(
     expect.objectContaining({ '작품명': '소나기' }),
-    ['2015', '7차'],
+    ['7차', '2015'],
   )
 })
 

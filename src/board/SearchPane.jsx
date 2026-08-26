@@ -1,7 +1,7 @@
 // 좌측 작품 검색 패널: 시트 작품을 작품 단위로 묶어 보여주고 권에 추가한다.
 import { useMemo, useState } from 'react'
 import { filterWorks, getUniqueValues } from '../works/filterWorks.js'
-import { workKeyOf, curriculaOf } from '../works/workKey.js'
+import { workKeyOf, curriculaOf, sortCurricula } from '../works/workKey.js'
 import { SELECTION_LABELS } from './constants.js'
 import MultiSelectDropdown from './MultiSelectDropdown.jsx'
 
@@ -13,7 +13,7 @@ export default function SearchPane({ works, duplicatesByKey, onAdd }) {
   const [genre, setGenre] = useState([])
   const [sortByCount, setSortByCount] = useState(false)
 
-  const curriculumOptions = useMemo(() => getUniqueValues(works, '교육과정'), [works])
+  const curriculumOptions = useMemo(() => sortCurricula(getUniqueValues(works, '교육과정')), [works])
   const genreOptions = useMemo(() => getUniqueValues(works, '장르'), [works])
 
   // 수록 횟수는 필터와 무관한 전체 시트 기준 (채택 빈도 지표)

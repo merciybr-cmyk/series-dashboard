@@ -1,4 +1,4 @@
-import { normText, keyOf, workKeyOf, buildRegistryMap, snapshotOf, curriculaOf } from '../works/workKey.js'
+import { normText, keyOf, workKeyOf, buildRegistryMap, snapshotOf, curriculaOf, sortCurricula } from '../works/workKey.js'
 
 test('normText: 연속 공백을 하나로, 앞뒤 공백 제거, 소문자화', () => {
   expect(normText('  별  헤는   밤 ')).toBe('별 헤는 밤')
@@ -32,8 +32,15 @@ test('snapshotOf / curriculaOf', () => {
     { '작품명': '소나기', '지은이': '황순원', _authorBase: '황순원', '장르': '소설', '교육과정': '2015' },
   ]
   const curricula = curriculaOf(works, workKeyOf(works[0]))
-  expect(curricula).toEqual(['2015', '7차'])
+  expect(curricula).toEqual(['7차', '2015'])
   expect(snapshotOf(works[0], curricula)).toEqual({
-    title: '소나기', author: '황순원', genre: '소설', curriculum: ['2015', '7차'],
+    title: '소나기', author: '황순원', genre: '소설', curriculum: ['7차', '2015'],
   })
+})
+
+test('sortCurricula: 1차~7차 → 2007·2009·2015·2022개정 순', () => {
+  expect(sortCurricula(['2015개정', '1차', '2022개정', '7차', '2007개정', '3차', '2009개정'])).toEqual(
+    ['1차', '3차', '7차', '2007개정', '2009개정', '2015개정', '2022개정'],
+  )
+  expect(sortCurricula(['알수없음', '1차'])).toEqual(['1차', '알수없음'])
 })
