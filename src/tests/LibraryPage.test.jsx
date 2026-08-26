@@ -21,15 +21,17 @@ function renderPage() {
 }
 
 const UPLOAD = { id: 'f1', kind: 'upload', name: '8월 회의록.pdf', uploaded_by: 'm1', created_at: '2026-08-26T09:00:00Z', storage_path: 'library/x' }
-const LINK = { id: 'f2', kind: 'link', name: '원고 드라이브 폴더', uploaded_by: 'm1', created_at: '2026-08-26T09:00:00Z', url: 'https://drive.example.com' }
 
-test('회의록과 드라이브 링크가 섹션으로 분리된다', async () => {
-  api.listLibraryFiles.mockResolvedValue([UPLOAD, LINK])
+test('회의록 섹션과 자료 저장소(드라이브) 섹션이 표시된다', async () => {
+  api.listLibraryFiles.mockResolvedValue([UPLOAD])
   renderPage()
   await waitFor(() => expect(screen.getByText(/8월 회의록\.pdf/)).toBeInTheDocument())
   expect(screen.getByRole('heading', { name: '회의록' })).toBeInTheDocument()
-  expect(screen.getByRole('heading', { name: '드라이브 링크' })).toBeInTheDocument()
-  expect(screen.getByText(/원고 드라이브 폴더/)).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: '자료 저장소' })).toBeInTheDocument()
+  const driveLink = screen.getByRole('link', { name: /구글 드라이브 자료 폴더 열기/ })
+  // 계정 무관 주소(/u/N/ 없이)여야 다른 구성원 브라우저에서도 올바른 계정으로 열린다
+  expect(driveLink).toHaveAttribute('href', 'https://drive.google.com/drive/folders/1Zd7GqScK2Umcgjr14ZxHMq47g_4J5RI5')
+  expect(driveLink).toHaveAttribute('target', '_blank')
   expect(screen.getByRole('button', { name: '8월 회의록.pdf 미리보기' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: '8월 회의록.pdf 다운로드' })).toBeInTheDocument()
 })
@@ -70,15 +72,3 @@ test('다운로드 버튼은 원본 파일명으로 서명 URL을 연다', async
   openSpy.mockRestore()
 })
 
-test('드라이브 링크를 등록한다', async () => {
-  api.listLibraryFiles.mockResolvedValue([])
-  api.addLibraryLink.mockResolvedValue({ ...LINK, id: 'f9', name: '원고 폴더', url: 'https://d.com' })
-  renderPage()
-  await waitFor(() => screen.getByRole('button', { name: '드라이브 링크 등록' }))
-  await userEvent.click(screen.getByRole('button', { name: '드라이브 링크 등록' }))
-  await userEvent.type(screen.getByPlaceholderText('자료 이름'), '원고 폴더')
-  await userEvent.type(screen.getByPlaceholderText('https://…'), 'https://d.com')
-  await userEvent.click(screen.getByRole('button', { name: '등록' }))
-  expect(api.addLibraryLink).toHaveBeenCalledWith('원고 폴더', 'https://d.com', null)
-  await waitFor(() => expect(screen.getByText(/원고 폴더/)).toBeInTheDocument())
-})

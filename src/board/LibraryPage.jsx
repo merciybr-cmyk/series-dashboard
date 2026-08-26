@@ -1,9 +1,12 @@
-// 자료실 (2026-08-27 사용자 결정 반영)
+// 자료실 (2026-08-28 사용자 결정 반영)
 // - 위: 회의록(서버 업로드, 최신순) — 미리보기(오른쪽 패널)·다운로드
-// - 아래: 드라이브 링크 (대용량 자료는 클라우드로)
+// - 아래: 자료 저장소 — 팀 공용 구글 드라이브 폴더로 바로 이동 (개별 링크 등록 없음)
 import { useEffect, useRef, useState } from 'react'
-import { listLibraryFiles, uploadLibraryFile, addLibraryLink, deleteFile, getFileUrl, listMembers } from './volumeApi.js'
+import { listLibraryFiles, uploadLibraryFile, deleteFile, getFileUrl, listMembers } from './volumeApi.js'
 import { useToast } from '../components/Toast.jsx'
+
+// 계정 무관 주소(/u/N/ 제외) — 접속자 권한이 있는 구글 계정으로 열린다
+const DRIVE_URL = 'https://drive.google.com/drive/folders/1Zd7GqScK2Umcgjr14ZxHMq47g_4J5RI5'
 
 // 브라우저가 자체 렌더링할 수 있는 형식만 패널 미리보기
 const PREVIEWABLE = new Set(['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'txt'])
@@ -17,9 +20,6 @@ function extOf(name) {
 export default function LibraryPage() {
   const [files, setFiles] = useState([])
   const [members, setMembers] = useState([])
-  const [linkOpen, setLinkOpen] = useState(false)
-  const [linkName, setLinkName] = useState('')
-  const [linkUrl, setLinkUrl] = useState('')
   const [preview, setPreview] = useState(null) // { file, url } | { file, unsupported: true }
   const fileInputRef = useRef(null)
   const { show } = useToast()
@@ -31,7 +31,6 @@ export default function LibraryPage() {
 
   const memberName = id => members.find(m => m.id === id)?.name || '알 수 없음'
   const uploads = files.filter(f => f.kind === 'upload') // listLibraryFiles가 최신순 정렬
-  const links = files.filter(f => f.kind === 'link')
 
   async function handleUpload(e) {
     const file = e.target.files?.[0]
@@ -44,19 +43,6 @@ export default function LibraryPage() {
     try {
       const row = await uploadLibraryFile(file, null)
       setFiles(fs => [row, ...fs])
-    } catch (err) {
-      show(err.message)
-    }
-  }
-
-  async function submitLink() {
-    const name = linkName.trim()
-    const url = linkUrl.trim()
-    if (!name || !url) return
-    try {
-      const row = await addLibraryLink(name, url, null)
-      setFiles(fs => [row, ...fs])
-      setLinkOpen(false); setLinkName(''); setLinkUrl('')
     } catch (err) {
       show(err.message)
     }
@@ -101,7 +87,7 @@ export default function LibraryPage() {
       <div className={preview ? 'w-[26rem] shrink-0' : 'min-w-0 max-w-3xl flex-1'}>
         <h2 className="mb-1 text-lg font-bold">자료실</h2>
         <p className="mb-4 text-sm text-gray-500">
-          서버 업로드는 회의록 등 소용량 파일만(50MB), 원고·PDF 등 대용량 자료는 드라이브 링크로 등록해 주세요.
+          회의록은 여기에 업로드하고(50MB 이하), 원고·PDF 등 자료는 아래 자료 저장소(구글 드라이브)에 올려 주세요.
         </p>
 
         <section className="mb-6">
@@ -131,37 +117,20 @@ export default function LibraryPage() {
         </section>
 
         <section>
-          <div className="mb-2 flex items-center gap-3">
-            <h3 className="font-semibold">드라이브 링크</h3>
-            <button type="button" onClick={() => setLinkOpen(o => !o)}
-              className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-600">드라이브 링크 등록</button>
-          </div>
-          {linkOpen && (
-            <div className="mb-2 flex flex-wrap items-center gap-2 rounded border border-gray-200 p-3">
-              <input value={linkName} onChange={e => setLinkName(e.target.value)} placeholder="자료 이름"
-                className="rounded border border-gray-300 px-2 py-1 text-sm" />
-              <input value={linkUrl} onChange={e => setLinkUrl(e.target.value)} placeholder="https://…"
-                className="rounded border border-gray-300 px-2 py-1 text-sm" />
-              <button type="button" onClick={submitLink}
-                className="rounded bg-blue-600 px-3 py-1 text-sm font-medium text-white">등록</button>
-            </div>
-          )}
-          <ul className="space-y-1">
-            {links.map(f => (
-              <li key={f.id} className="flex items-center gap-2 rounded border border-gray-100 px-3 py-2 text-sm">
-                <button type="button" onClick={() => window.open(f.url, '_blank', 'noopener')}
-                  className="min-w-0 flex-1 truncate text-left text-blue-700 hover:underline">
-                  🔗 {f.name}
-                </button>
-                <span className="shrink-0 text-xs text-gray-400">
-                  {memberName(f.uploaded_by)} · {new Date(f.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}
-                </span>
-                <button type="button" aria-label={`${f.name} 삭제`} onClick={() => removeFile(f)}
-                  className="shrink-0 text-gray-300 hover:text-red-500">✕</button>
-              </li>
-            ))}
-            {!links.length && <li className="text-sm text-gray-400">등록된 링크가 없습니다</li>}
-          </ul>
+          <h3 className="mb-2 font-semibold">자료 저장소</h3>
+          <a
+            href={DRIVE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 rounded border border-gray-200 px-4 py-3 text-sm hover:bg-gray-50"
+          >
+            <span className="text-xl">📁</span>
+            <span className="flex-1">
+              <span className="block font-medium text-blue-700">구글 드라이브 자료 폴더 열기</span>
+              <span className="block text-xs text-gray-500">원고·PDF 등 자료는 드라이브 폴더에서 관리합니다 (공통/권별은 폴더로 구분)</span>
+            </span>
+            <span aria-hidden className="text-gray-400">↗</span>
+          </a>
         </section>
       </div>
 
