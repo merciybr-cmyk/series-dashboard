@@ -52,3 +52,20 @@ test('필터가 걸려도 수록 횟수는 전체 기준이다', async () => {
   await userEvent.click(screen.getByLabelText('7차'))
   expect(screen.getByText('수록 2회')).toBeInTheDocument()
 })
+
+test("'수록 많은 순'을 켜면 횟수 내림차순으로 정렬된다", async () => {
+  // 기본 순서: 별 헤는 밤이 소나기보다 뒤(시트 순) — 픽스처상 소나기가 먼저.
+  // 검증을 위해 1회짜리(별 헤는 밤)가 앞에 오는 배열을 별도로 구성한다.
+  const works = [
+    WORKS[2],            // 별 헤는 밤 (1회)
+    WORKS[0], WORKS[1],  // 소나기 (2회)
+  ]
+  render(<SearchPane works={works} duplicatesByKey={new Map()} onAdd={() => {}} />)
+  const firstTitle = () => screen.getAllByRole('listitem')[0].textContent
+  expect(firstTitle()).toContain('별 헤는 밤')
+  await userEvent.click(screen.getByLabelText('수록 많은 순'))
+  expect(firstTitle()).toContain('소나기')
+  // 끄면 원래 순서로 복귀
+  await userEvent.click(screen.getByLabelText('수록 많은 순'))
+  expect(firstTitle()).toContain('별 헤는 밤')
+})

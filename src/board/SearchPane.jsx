@@ -11,6 +11,7 @@ export default function SearchPane({ works, duplicatesByKey, onAdd }) {
   const [query, setQuery] = useState('')
   const [curriculum, setCurriculum] = useState([])
   const [genre, setGenre] = useState([])
+  const [sortByCount, setSortByCount] = useState(false)
 
   const curriculumOptions = useMemo(() => getUniqueValues(works, '교육과정'), [works])
   const genreOptions = useMemo(() => getUniqueValues(works, '장르'), [works])
@@ -33,8 +34,12 @@ export default function SearchPane({ works, duplicatesByKey, onAdd }) {
       const key = workKeyOf(w)
       if (!map.has(key)) map.set(key, { rep: w })
     }
-    return [...map.entries()] // [key, {rep}]
-  }, [works, curriculum, genre, query])
+    const entries = [...map.entries()] // [key, {rep}]
+    if (sortByCount) {
+      entries.sort((a, b) => (countsByKey.get(b[0]) || 0) - (countsByKey.get(a[0]) || 0))
+    }
+    return entries
+  }, [works, curriculum, genre, query, sortByCount, countsByKey])
 
   return (
     <div className="flex h-full flex-col">
@@ -49,7 +54,13 @@ export default function SearchPane({ works, duplicatesByKey, onAdd }) {
         <MultiSelectDropdown label="갈래" options={genreOptions} selected={genre} onChange={setGenre} />
       </div>
 
-      <p className="mb-1 text-xs text-gray-400">작품 {grouped.length}건{grouped.length > MAX_SHOWN ? ` (상위 ${MAX_SHOWN}건 표시)` : ''}</p>
+      <div className="mb-1 flex items-center gap-3">
+        <p className="text-xs text-gray-400">작품 {grouped.length}건{grouped.length > MAX_SHOWN ? ` (상위 ${MAX_SHOWN}건 표시)` : ''}</p>
+        <label className="ml-auto flex items-center gap-1 text-xs text-gray-500">
+          <input type="checkbox" checked={sortByCount} onChange={e => setSortByCount(e.target.checked)} />
+          수록 많은 순
+        </label>
+      </div>
 
       <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
         {grouped.slice(0, MAX_SHOWN).map(([key, { rep: w }]) => {
