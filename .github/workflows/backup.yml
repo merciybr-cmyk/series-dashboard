@@ -1,0 +1,50 @@
+name: backup
+
+on:
+  schedule:
+    - cron: '30 18 * * 0' # 매주 일요일 18:30 UTC = 월요일 03:30 KST — 주 1회 DB 백업
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 시크릿 확인
+        run: |
+          # 공개 저장소이므로 암호화 없이는 절대 업로드하지 않는다 (docs/backup.md 참고)
+          if [ -z "${{ secrets.SUPABASE_DB_URL }}" ] || [ -z "${{ secrets.BACKUP_PASSPHRASE }}" ]; then
+            echo "::error::SUPABASE_DB_URL / BACKUP_PASSPHRASE 시크릿이 필요합니다. docs/backup.md 참고."
+            exit 1
+          fi
+
+      - name: pg_dump 17 설치
+        run: |
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y --no-install-recommends postgresql-client-17
+
+      - name: public 스키마 덤프
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          /usr/lib/postgresql/17/bin/pg_dump "$DB_URL" \
+            --schema=public --format=custom --no-owner --no-privileges \
+            --file=backup.dump
+          ls -lh backup.dump
+
+      - name: 암호화 (AES-256)
+        env:
+          PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt \
+            -pass env:PASSPHRASE -in backup.dump -out backup.dump.enc
+          rm backup.dump
+
+      - name: 아티팩트 업로드 (90일 보관)
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_number }}
+          path: backup.dump.enc
+          retention-days: 90
