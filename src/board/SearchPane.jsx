@@ -5,8 +5,6 @@ import { workKeyOf, curriculaOf, sortCurricula } from '../works/workKey.js'
 import { SELECTION_LABELS } from './constants.js'
 import MultiSelectDropdown from './MultiSelectDropdown.jsx'
 
-const MAX_SHOWN = 50
-
 // pickKeys(Set)가 주어지면 "갈래 후보만" 토글이 나타나고 기본 ON — 후보 풀에서만 검색 (2026-08-26)
 export default function SearchPane({ works, duplicatesByKey, onAdd, pickKeys = null }) {
   const [query, setQuery] = useState('')
@@ -60,7 +58,7 @@ export default function SearchPane({ works, duplicatesByKey, onAdd, pickKeys = n
       </div>
 
       <div className="mb-1 flex items-center gap-3">
-        <p className="text-xs text-gray-400">작품 {grouped.length}건{grouped.length > MAX_SHOWN ? ` (상위 ${MAX_SHOWN}건 표시)` : ''}</p>
+        <p className="text-xs text-gray-400">작품 {grouped.length}건</p>
         {pickKeys && (
           <label className="ml-auto flex items-center gap-1 text-xs text-gray-500">
             <input type="checkbox" checked={onlyPicks} onChange={e => setOnlyPicks(e.target.checked)} />
@@ -74,7 +72,7 @@ export default function SearchPane({ works, duplicatesByKey, onAdd, pickKeys = n
       </div>
 
       <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
-        {grouped.slice(0, MAX_SHOWN).map(([key, { rep: w }]) => {
+        {grouped.map(([key, { rep: w }]) => {
           const dups = duplicatesByKey.get(key) || []
           return (
             <li key={key} className="flex items-center gap-2 rounded border border-gray-100 px-3 py-2 text-sm">
