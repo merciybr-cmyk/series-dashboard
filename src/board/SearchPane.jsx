@@ -40,6 +40,11 @@ export default function SearchPane({ works, duplicatesByKey, onAdd, pickKeys = n
     }
     if (sortByCount) {
       entries.sort((a, b) => (countsByKey.get(b[0]) || 0) - (countsByKey.get(a[0]) || 0))
+    } else {
+      // 기본 정렬: 작품명 가나다순 (동명 작품은 작가명순)
+      entries.sort((a, b) =>
+        a[1].rep['작품명'].localeCompare(b[1].rep['작품명'], 'ko') ||
+        (a[1].rep._authorBase ?? '').localeCompare(b[1].rep._authorBase ?? '', 'ko'))
     }
     return entries
   }, [works, curriculum, genre, query, sortByCount, countsByKey, pickKeys, onlyPicks])
