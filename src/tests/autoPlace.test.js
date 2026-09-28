@@ -92,3 +92,11 @@ test('품질 기준: 현대시 132편 (스펙 §2.5)', () => {
   expect(placements.filter(p => p.reasons.includes('debut')).length).toBeGreaterThanOrEqual(85)
   expect(placements.filter(p => p.reasons.includes('concept')).length).toBeGreaterThanOrEqual(110)
 })
+
+test('작자 미상(빈 작가·미상)은 서로 다른 작가로 본다 — 작가 중복 제한 없음', () => {
+  const works = ['', '', '미상', '작자 미상'].map((author, i) => W(`W${i}`, `노래${i}`, author, ['6차']))
+  const { placements, unplaceable } = autoPlace({ works, volumes: VOLUMES, existing: [], bucket: '고전운문' })
+  expect(unplaceable).toEqual([])
+  expect(placements).toHaveLength(4)
+  expect(placements.every(p => p.volumeId === 'v4' && p.warnings.length === 0)).toBe(true)
+})

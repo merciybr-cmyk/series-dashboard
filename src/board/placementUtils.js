@@ -1,7 +1,7 @@
 // 자동 배치 화면용 순수 도우미 (설계 2026-09-28 §1.5·§3)
 import { bucketOf } from './genreUtils.js'
 import { keyOf, workKeyOf, sortCurricula, curriculumRank } from '../works/workKey.js'
-import { AUTHOR_LIMIT, firstCurriculum, isEligible, reasonsFor } from './autoPlace.js'
+import { AUTHOR_LIMIT, firstCurriculum, isEligible, isKnownAuthor, reasonsFor } from './autoPlace.js'
 
 // 갈래 → 부 번호 (고전산문은 2·3부 어느 쪽도 가능해 미배정 — 2026-09-28 사용자 결정)
 export const PART_BY_BUCKET = { '현대시': 1, '고전운문': 1, '현대소설': 2, '현대수필·극': 3, '고전산문': null }
@@ -81,7 +81,7 @@ const byCurriculumThenTitle = (a, b) =>
 export function evaluateAssignment({ works, volumes, existing, bucket, assignment }) {
   const active = existing.filter(e => e.selection_status !== 'excluded')
   const authorCount = new Map()
-  const bump = (vid, a) => authorCount.set(`${vid}|${a}`, (authorCount.get(`${vid}|${a}`) || 0) + 1)
+  const bump = (vid, a) => { if (isKnownAuthor(a)) authorCount.set(`${vid}|${a}`, (authorCount.get(`${vid}|${a}`) || 0) + 1) }
   for (const e of active) bump(e.volumeId, e.author)
   for (const w of works) {
     const vid = assignment.get(w.workId)
@@ -94,7 +94,7 @@ export function evaluateAssignment({ works, volumes, existing, bucket, assignmen
       .sort(byCurriculumThenTitle)
       .map(w => {
         const eligible = isEligible(w, v)
-        const n = authorCount.get(`${v.id}|${w.author}`) || 0
+        const n = isKnownAuthor(w.author) ? authorCount.get(`${v.id}|${w.author}`) || 0 : 0
         const warnings = []
         if (!eligible) warnings.push('ineligible')
         if (n > AUTHOR_LIMIT) warnings.push('authorOver')
