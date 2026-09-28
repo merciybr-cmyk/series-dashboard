@@ -12,6 +12,7 @@ import ComparePage from './board/ComparePage.jsx'
 import GenrePicksPage from './board/GenrePicksPage.jsx'
 import SchedulePage from './board/SchedulePage.jsx'
 import LibraryPage from './board/LibraryPage.jsx'
+import AutoPlacePage from './board/AutoPlacePage.jsx'
 
 // 초대·매직링크의 #access_token=... 해시는 라우터가 모르는 경로다.
 // supabase가 세션 처리를 마치면(loading 종료) 홈으로 보낸다 — 빈 화면 방지.
@@ -42,6 +43,7 @@ export default function App() {
               <Route path="/volumes" element={<VolumesPage />} />
               <Route path="/volumes/:id" element={<VolumeBoardPage />} />
               <Route path="/compare" element={<ComparePage />} />
+              <Route path="/auto-place" element={<AutoPlacePage />} />
               <Route path="/schedule" element={<SchedulePage />} />
               <Route path="/library" element={<LibraryPage />} />
             </Route>
