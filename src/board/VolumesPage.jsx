@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listVolumes, createVolume, updateVolume, deleteVolume } from './volumeApi.js'
 import { useToast } from '../components/Toast.jsx'
+import MultiSelectDropdown from './MultiSelectDropdown.jsx'
+import { CURRICULUM_OPTIONS } from './constants.js'
+import { sortCurricula } from '../works/workKey.js'
 
 export default function VolumesPage() {
   const [volumes, setVolumes] = useState([])
@@ -11,6 +14,7 @@ export default function VolumesPage() {
   const [editingId, setEditingId] = useState(null)
   const [editNumber, setEditNumber] = useState('')
   const [editTitle, setEditTitle] = useState('')
+  const [editCurricula, setEditCurricula] = useState([])
   const { show } = useToast()
 
   useEffect(() => {
@@ -34,12 +38,17 @@ export default function VolumesPage() {
     setEditingId(v.id)
     setEditNumber(String(v.number))
     setEditTitle(v.title)
+    setEditCurricula(v.curricula || [])
   }
 
   async function handleUpdate(e) {
     e.preventDefault()
+    const current = volumes.find(x => x.id === editingId)
+    const patch = { number: Number(editNumber), title: editTitle.trim() }
+    // phase5.sql 적용 전 DB에는 curricula 컬럼이 없다 — 행에 키가 있을 때만 보낸다
+    if (current && 'curricula' in current) patch.curricula = sortCurricula(editCurricula)
     try {
-      const v = await updateVolume(editingId, { number: Number(editNumber), title: editTitle.trim() })
+      const v = await updateVolume(editingId, patch)
       setVolumes(vs => vs.map(x => (x.id === v.id ? v : x)).sort((a, b) => a.number - b.number))
       setEditingId(null)
     } catch (err) {
@@ -62,7 +71,13 @@ export default function VolumesPage() {
 
   return (
     <div className="max-w-3xl">
-      <h2 className="mb-4 text-lg font-bold">권별 작품 목록</h2>
+      <div className="mb-4 flex items-center gap-3">
+        <h2 className="text-lg font-bold">권별 작품 목록</h2>
+        <Link to="/auto-place"
+          className="ml-auto rounded bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700">
+          자동 배치
+        </Link>
+      </div>
 
       <ul className="mb-6 space-y-2">
         {volumes.map(v => (
@@ -81,6 +96,13 @@ export default function VolumesPage() {
                     value={editTitle} onChange={e => setEditTitle(e.target.value)}
                     className="w-full rounded border border-gray-300 px-2 py-1" />
                 </div>
+                {'curricula' in v && (
+                  <div>
+                    <span className="block text-xs text-gray-500">교육과정기</span>
+                    <MultiSelectDropdown label="교육과정기" options={CURRICULUM_OPTIONS}
+                      selected={editCurricula} onChange={setEditCurricula} />
+                  </div>
+                )}
                 <button type="submit" className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white">저장</button>
                 <button type="button" onClick={() => setEditingId(null)} className="text-sm text-gray-500">취소</button>
               </form>
@@ -91,6 +113,9 @@ export default function VolumesPage() {
               >
                 <span className="font-semibold">{v.number}권</span>
                 <span className="flex-1">{v.title}</span>
+                {(v.curricula || []).length > 0 && (
+                  <span className="text-xs text-gray-400">{v.curricula.join('·')}</span>
+                )}
                 <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{v.status}</span>
                 <button type="button" onClick={e => startEdit(e, v)}
                   className="text-xs text-gray-400 underline hover:text-gray-700">수정</button>
