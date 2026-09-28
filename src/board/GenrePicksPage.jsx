@@ -21,6 +21,7 @@ export default function GenrePicksPage() {
   const [volumes, setVolumes] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeBucket, setActiveBucket] = useState(GENRE_BUCKETS[0])
+  const [onlyUntagged, setOnlyUntagged] = useState(false)
 
   const load = useCallback(() => {
     api.listPicks().then(setPicks).catch(err => show(err.message)).finally(() => setLoading(false))
@@ -94,7 +95,11 @@ export default function GenrePicksPage() {
 
   if (loading) return <p className="text-gray-500">불러오는 중…</p>
 
-  const activePicks = groups[activeBucket] || []
+  const bucketPicks = groups[activeBucket] || []
+  // 콘셉트 태그 칸은 phase5.sql 이후에만 있다 — 칸이 있는 후보 중 빈 것만 센다
+  const untagged = bucketPicks.filter(p => 'concept_volume_ids' in p && !(p.concept_volume_ids || []).length)
+  const hasTags = bucketPicks.some(p => 'concept_volume_ids' in p)
+  const activePicks = onlyUntagged ? untagged : bucketPicks
 
   return (
     <div>
@@ -152,6 +157,18 @@ export default function GenrePicksPage() {
                 {b} {groups[b]?.length ? `(${groups[b].length})` : ''}
               </button>
             ))}
+            {hasTags && (untagged.length > 0 || onlyUntagged) && (
+              <button
+                type="button"
+                aria-pressed={onlyUntagged}
+                onClick={() => setOnlyUntagged(v => !v)}
+                className={`ml-auto rounded border px-2 py-1 text-xs ${
+                  onlyUntagged ? 'border-purple-600 bg-purple-600 text-white' : 'border-purple-300 text-purple-700 hover:bg-purple-50'
+                }`}
+              >
+                태그 없음 {untagged.length}
+              </button>
+            )}
           </div>
 
           <ul className="space-y-1">

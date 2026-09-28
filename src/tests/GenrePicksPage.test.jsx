@@ -104,3 +104,19 @@ test('phase5 전(concept_volume_ids 없음)에는 칩을 보이지 않는다', a
   await screen.findByRole('button', { name: '봄 길 제거' })
   expect(screen.queryByRole('button', { name: '봄 길 어울리는 권' })).not.toBeInTheDocument()
 })
+
+test("'태그 없음' 버튼으로 태그가 빈 후보만 걸러 본다", async () => {
+  api.listVolumes.mockResolvedValue([{ id: 'v7', number: 7, title: '온도' }])
+  api.listPicks.mockResolvedValue([
+    { id: 'p1', work_id: 'W1', concept_volume_ids: ['v7'], work_snapshot: { title: '봄 길', author: '정호승', genre: '시', curriculum: [] } },
+    { id: 'p2', work_id: 'W2', concept_volume_ids: [], work_snapshot: { title: '이별가', author: '박목월', genre: '시', curriculum: [] } },
+  ])
+  renderPage()
+  const filter = await screen.findByRole('button', { name: '태그 없음 1' })
+  expect(screen.getByRole('button', { name: '봄 길 제거' })).toBeInTheDocument()
+  await userEvent.click(filter)
+  expect(screen.queryByRole('button', { name: '봄 길 제거' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '이별가 제거' })).toBeInTheDocument()
+  await userEvent.click(filter)
+  expect(screen.getByRole('button', { name: '봄 길 제거' })).toBeInTheDocument()
+})
