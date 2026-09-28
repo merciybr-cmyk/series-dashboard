@@ -5,6 +5,7 @@ import { listVolumes, listAllVolumeWorks, listAllParts } from './volumeApi.js'
 import { groupByPart, partLabel } from './boardUtils.js'
 import { SELECTION_LABELS } from './constants.js'
 import { useToast } from '../components/Toast.jsx'
+import { downloadCompareExcel } from './exportCompare.js'
 
 const SELECTION_BADGE = {
   candidate: 'bg-gray-100 text-gray-700',
@@ -54,6 +55,14 @@ export default function ComparePage() {
           확정만 보기
         </label>
         <span className="text-xs text-gray-400">노란 배경 = 다른 권과 겹치는 작품 (제외 상태는 겹침에서 뺌)</span>
+        <button
+          type="button"
+          onClick={() => downloadCompareExcel({ volumes, allVw, allParts, confirmedOnly })}
+          disabled={!volumes.length}
+          className="ml-auto rounded border border-gray-300 px-3 py-1 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+        >
+          엑셀로 저장
+        </button>
       </div>
 
       <div className="grid gap-4 pb-4 md:grid-cols-2 xl:grid-cols-4">
