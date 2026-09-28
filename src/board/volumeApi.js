@@ -80,10 +80,10 @@ export async function ensureWorkId(work, curricula, registryMap) {
 
 // ---------- volume_parts (부) ----------
 
-export async function createPart(volumeId, number) {
+export async function createPart(volumeId, number, title = null) {
   return unwrap(
     await supabase.from('volume_parts')
-      .insert({ volume_id: volumeId, number, sort_order: number * 10 })
+      .insert({ volume_id: volumeId, number, title, sort_order: number * 10 })
       .select().single(),
   )
 }
@@ -337,4 +337,83 @@ export function subscribeBoard(onChange) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'work_tasks' }, onChange)
     .subscribe()
   return () => supabase.removeChannel(ch)
+}
+
+// ---------- 자동 배치 (5단계, 설계 2026-09-28) ----------
+
+// phase5.sql 미실행(컬럼·테이블 없음) 오류인가
+export function isMissingSchemaError(err) {
+  return /placement_batches|placement_batch_id|concept_volume_ids|curricula|schema cache|does not exist/i
+    .test(err?.message || '')
+}
+
+export async function updatePickConcept(id, conceptVolumeIds) {
+  return unwrap(
+    await supabase.from('genre_picks').update({ concept_volume_ids: conceptVolumeIds })
+      .eq('id', id).select().single(),
+  )
+}
+
+export async function listPlacementBatches() {
+  return unwrap(await supabase.from('placement_batches').select('*').order('created_at', { ascending: false }))
+}
+
+export async function createPlacementBatch(genre) {
+  return unwrap(await supabase.from('placement_batches').insert({ genre }).select().single())
+}
+
+export async function updatePlacementBatch(id, patch) {
+  return unwrap(await supabase.from('placement_batches').update(patch).eq('id', id).select().single())
+}
+
+// 자동 배치 1편 추가. 같은 권에 이미 있으면(23505) null — 호출 측이 '건너뜀'으로 처리
+export async function insertPlacedWork({ volumeId, workId, workSnapshot, partId, batchId, sortOrder }) {
+  const { data, error } = await supabase.from('volume_works').insert({
+    volume_id: volumeId,
+    work_id: workId,
+    work_snapshot: workSnapshot,
+    part_id: partId ?? null,
+    placement_batch_id: batchId,
+    sort_order: sortOrder,
+  }).select().single()
+  if (error) {
+    if (error.code === '23505') return null
+    throw new Error(error.message)
+  }
+  return data
+}
+
+export async function listBatchWorks(batchId) {
+  return unwrap(
+    await supabase.from('volume_works')
+      .select('id, volume_id, work_id, part_id, selection_status, work_snapshot, volumes(number)')
+      .eq('placement_batch_id', batchId),
+  )
+}
+
+// 되돌리기 판정용: 행들에 딸린 업무·의견·자료의 volume_work_id
+export async function listAttachmentRefs(volumeWorkIds) {
+  if (!volumeWorkIds.length) return { tasks: [], comments: [], files: [] }
+  const [t, c, f] = await Promise.all([
+    supabase.from('work_tasks').select('volume_work_id').in('volume_work_id', volumeWorkIds),
+    supabase.from('work_comments').select('volume_work_id').in('volume_work_id', volumeWorkIds),
+    supabase.from('files').select('volume_work_id').in('volume_work_id', volumeWorkIds),
+  ])
+  return {
+    tasks: unwrap(t).map(r => r.volume_work_id),
+    comments: unwrap(c).map(r => r.volume_work_id),
+    files: unwrap(f).map(r => r.volume_work_id),
+  }
+}
+
+export async function deleteVolumeWorks(ids) {
+  if (!ids.length) return
+  unwrap(await supabase.from('volume_works').delete().in('id', ids))
+}
+
+// 주어진 부 중 아직 작품이 남아 있는 부의 id
+export async function listNonEmptyPartIds(partIds) {
+  if (!partIds.length) return []
+  const rows = unwrap(await supabase.from('volume_works').select('part_id').in('part_id', partIds))
+  return [...new Set(rows.map(r => r.part_id))]
 }

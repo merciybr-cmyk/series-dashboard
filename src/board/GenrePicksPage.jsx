@@ -8,6 +8,7 @@ import { sortCurricula } from '../works/workKey.js'
 import { downloadBucketExcel, downloadAllExcel } from './exportPicks.js'
 import { SELECTION_LABELS } from './constants.js'
 import SearchPane from './SearchPane.jsx'
+import ConceptTags from './ConceptTags.jsx'
 import { useToast } from '../components/Toast.jsx'
 
 export default function GenrePicksPage() {
@@ -17,6 +18,7 @@ export default function GenrePicksPage() {
   const [picks, setPicks] = useState([])
   const [registry, setRegistry] = useState([])
   const [allVw, setAllVw] = useState([])
+  const [volumes, setVolumes] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeBucket, setActiveBucket] = useState(GENRE_BUCKETS[0])
 
@@ -24,6 +26,7 @@ export default function GenrePicksPage() {
     api.listPicks().then(setPicks).catch(err => show(err.message)).finally(() => setLoading(false))
     api.listRegistry().then(setRegistry).catch(() => {})
     api.listAllVolumeWorks().then(setAllVw).catch(() => {})
+    api.listVolumes().then(setVolumes).catch(() => {})
   }, [show])
 
   useEffect(load, [load])
@@ -64,6 +67,17 @@ export default function GenrePicksPage() {
       show(`「${pick.work_snapshot?.title}」을(를) ${bucket} 후보에 추가했습니다`)
       api.listRegistry().then(setRegistry).catch(() => {}) // 신규 work_id만 반영 (picks 재조회는 로컬 추가를 덮어쓰는 경합이 됨)
     } catch (err) {
+      show(err.message)
+    }
+  }
+
+  async function handleConcept(pick, ids) {
+    const prev = pick.concept_volume_ids
+    setPicks(ps => ps.map(p => (p.id === pick.id ? { ...p, concept_volume_ids: ids } : p)))
+    try {
+      await api.updatePickConcept(pick.id, ids)
+    } catch (err) {
+      setPicks(ps => ps.map(p => (p.id === pick.id ? { ...p, concept_volume_ids: prev } : p)))
       show(err.message)
     }
   }
@@ -158,6 +172,14 @@ export default function GenrePicksPage() {
                       </div>
                     )}
                   </div>
+                  {'concept_volume_ids' in p && (
+                    <ConceptTags
+                      title={p.work_snapshot?.title}
+                      volumeIds={p.concept_volume_ids || []}
+                      volumes={volumes}
+                      onSave={ids => handleConcept(p, ids)}
+                    />
+                  )}
                   {dups.map((d, i) => (
                     <span
                       key={`${d.volumeNumber}-${i}`}

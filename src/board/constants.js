@@ -22,3 +22,6 @@ export const TASK_PRESETS = [
   { type: 'extra', label: '부가 원고 작성' },
   { type: 'image', label: '이미지 확보' },
 ]
+
+// 작품 DB 시트의 교육과정 표기 (권의 교육과정기 선택지 — 5단계 자동 배치)
+export const CURRICULUM_OPTIONS = ['1차', '2차', '3차', '4차', '5차', '6차', '7차', '2007개정', '2009개정', '2015개정', '2022개정']

@@ -161,3 +161,39 @@ test('uploadLibraryFile: library/ 경로에 새니타이즈 키로 업로드한�
 test('addLibraryLink: http(s) 외 스킴을 거부한다', async () => {
   await expect(api.addLibraryLink('자료', 'ftp://x', null)).rejects.toThrow('http')
 })
+
+test('isMissingSchemaError: phase5 미실행 오류를 알아본다', () => {
+  expect(api.isMissingSchemaError(new Error('relation "public.placement_batches" does not exist'))).toBe(true)
+  expect(api.isMissingSchemaError(new Error("Could not find the 'curricula' column of 'volumes' in the schema cache"))).toBe(true)
+  expect(api.isMissingSchemaError(new Error('network down'))).toBe(false)
+})
+
+test('insertPlacedWork: 같은 권 중복(23505)이면 null', async () => {
+  fromResults.push({ data: null, error: { code: '23505', message: 'duplicate key' } })
+  const row = await api.insertPlacedWork({ volumeId: 'v1', workId: 'W1', workSnapshot: {}, partId: null, batchId: 'b1', sortOrder: 10 })
+  expect(row).toBeNull()
+})
+
+test('insertPlacedWork: 그 밖의 오류는 던진다', async () => {
+  fromResults.push({ data: null, error: { code: '42501', message: 'denied' } })
+  await expect(api.insertPlacedWork({ volumeId: 'v1', workId: 'W1', workSnapshot: {}, partId: null, batchId: 'b1', sortOrder: 10 }))
+    .rejects.toThrow('denied')
+})
+
+test('listAttachmentRefs: 빈 목록이면 조회하지 않는다', async () => {
+  expect(await api.listAttachmentRefs([])).toEqual({ tasks: [], comments: [], files: [] })
+  expect(mockSupabase.from).not.toHaveBeenCalled()
+})
+
+test('listAttachmentRefs: 세 테이블의 volume_work_id를 모은다', async () => {
+  fromResults.push({ data: [{ volume_work_id: 'a' }], error: null })
+  fromResults.push({ data: [], error: null })
+  fromResults.push({ data: [{ volume_work_id: 'b' }], error: null })
+  expect(await api.listAttachmentRefs(['a', 'b'])).toEqual({ tasks: ['a'], comments: [], files: ['b'] })
+  expect(mockSupabase.from.mock.calls.map(c => c[0])).toEqual(['work_tasks', 'work_comments', 'files'])
+})
+
+test('listNonEmptyPartIds: 중복 없이 part_id를 돌려준다', async () => {
+  fromResults.push({ data: [{ part_id: 'p1' }, { part_id: 'p1' }], error: null })
+  expect(await api.listNonEmptyPartIds(['p1', 'p2'])).toEqual(['p1'])
+})

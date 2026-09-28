@@ -66,3 +66,33 @@ test('권 삭제는 확인 후 목록에서 제거한다', async () => {
   await waitFor(() => expect(screen.queryByText('가족')).not.toBeInTheDocument())
   window.confirm.mockRestore()
 })
+
+test('교육과정기가 있는 권은 목록에 표시하고, 수정 폼에서 바꿀 수 있다', async () => {
+  api.listVolumes.mockResolvedValue([{ id: 'v2', number: 2, title: '오래 남을 문학의 자리', status: '기획', curricula: ['4차'] }])
+  api.updateVolume.mockResolvedValue({ id: 'v2', number: 2, title: '오래 남을 문학의 자리', status: '기획', curricula: ['4차', '5차'] })
+  renderPage()
+  await waitFor(() => expect(screen.getByText('4차')).toBeInTheDocument())
+  await userEvent.click(screen.getByRole('button', { name: '수정' }))
+  await userEvent.click(screen.getByRole('button', { name: /교육과정기/ }))
+  await userEvent.click(screen.getByLabelText('5차'))
+  await userEvent.click(screen.getByRole('button', { name: '저장' }))
+  expect(api.updateVolume).toHaveBeenCalledWith('v2', { number: 2, title: '오래 남을 문학의 자리', curricula: ['4차', '5차'] })
+  await waitFor(() => expect(screen.getByText('4차·5차')).toBeInTheDocument())
+})
+
+test('phase5 전(curricula 없음)에는 수정 시 curricula를 보내지 않는다', async () => {
+  api.listVolumes.mockResolvedValue([{ id: 'v1', number: 1, title: '첫 장면', status: '기획' }])
+  api.updateVolume.mockResolvedValue({ id: 'v1', number: 1, title: '첫 장면', status: '기획' })
+  renderPage()
+  await waitFor(() => screen.getByRole('button', { name: '수정' }))
+  await userEvent.click(screen.getByRole('button', { name: '수정' }))
+  expect(screen.queryByRole('button', { name: /교육과정기/ })).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: '저장' }))
+  expect(api.updateVolume).toHaveBeenCalledWith('v1', { number: 1, title: '첫 장면' })
+})
+
+test("'자동 배치' 링크가 있다", async () => {
+  api.listVolumes.mockResolvedValue([])
+  renderPage()
+  await waitFor(() => expect(screen.getByRole('link', { name: '자동 배치' })).toHaveAttribute('href', '#/auto-place'))
+})
