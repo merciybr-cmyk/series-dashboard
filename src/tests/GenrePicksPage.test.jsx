@@ -14,6 +14,8 @@ vi.mock('../board/volumeApi.js', () => ({
   deletePick: vi.fn(),
   listRegistry: vi.fn().mockResolvedValue([]),
   listAllVolumeWorks: vi.fn().mockResolvedValue([]),
+  listVolumes: vi.fn().mockResolvedValue([]),
+  updatePickConcept: vi.fn(),
 }))
 const api = await import('../board/volumeApi.js')
 const { default: GenrePicksPage } = await import('../board/GenrePicksPage.jsx')
@@ -74,4 +76,31 @@ test('후보 제거는 confirm 후 목록에서 사라진다', async () => {
   expect(api.deletePick).toHaveBeenCalledWith('p1')
   await waitFor(() => expect(screen.queryByRole('button', { name: '진달래꽃 제거' })).not.toBeInTheDocument())
   window.confirm.mockRestore()
+})
+
+test("'어울리는 권' 칩으로 콘셉트 태그를 편집한다", async () => {
+  api.listVolumes.mockResolvedValue([
+    { id: 'v7', number: 7, title: '문학과 함께 자라는 우리' },
+    { id: 'v8', number: 8, title: '내일을 여는 문학 수업' },
+  ])
+  api.listPicks.mockResolvedValue([
+    { id: 'p1', work_id: 'W1', concept_volume_ids: ['v7'], work_snapshot: { title: '봄 길', author: '정호승', genre: '시', curriculum: [] } },
+  ])
+  api.updatePickConcept.mockResolvedValue({})
+  renderPage()
+  const chip = await screen.findByRole('button', { name: '봄 길 어울리는 권' })
+  await waitFor(() => expect(chip).toHaveTextContent('7권')) // 권 목록은 후보와 따로 로드된다
+  await userEvent.click(chip)
+  await userEvent.click(screen.getByRole('checkbox', { name: /8권/ }))
+  expect(api.updatePickConcept).toHaveBeenCalledWith('p1', ['v7', 'v8'])
+  await waitFor(() => expect(chip).toHaveTextContent('7권 8권'))
+})
+
+test('phase5 전(concept_volume_ids 없음)에는 칩을 보이지 않는다', async () => {
+  api.listPicks.mockResolvedValue([
+    { id: 'p1', work_id: 'W1', work_snapshot: { title: '봄 길', author: '정호승', genre: '시', curriculum: [] } },
+  ])
+  renderPage()
+  await screen.findByRole('button', { name: '봄 길 제거' })
+  expect(screen.queryByRole('button', { name: '봄 길 어울리는 권' })).not.toBeInTheDocument()
 })
