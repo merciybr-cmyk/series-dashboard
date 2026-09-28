@@ -197,3 +197,19 @@ test('listNonEmptyPartIds: 중복 없이 part_id를 돌려준다', async () => {
   fromResults.push({ data: [{ part_id: 'p1' }, { part_id: 'p1' }], error: null })
   expect(await api.listNonEmptyPartIds(['p1', 'p2'])).toEqual(['p1'])
 })
+
+test('listRegistry: 1000행 제한을 넘으면 나눠 받아 전부 돌려준다', async () => {
+  const page1 = Array.from({ length: 1000 }, (_, i) => ({ work_id: `W${i}` }))
+  const page2 = Array.from({ length: 102 }, (_, i) => ({ work_id: `X${i}` }))
+  fromResults.push({ data: page1, error: null })
+  fromResults.push({ data: page2, error: null })
+  const rows = await api.listRegistry()
+  expect(rows).toHaveLength(1102)
+  expect(mockSupabase.from).toHaveBeenCalledTimes(2)
+})
+
+test('listRegistry: 1000행 미만이면 한 번만 조회한다', async () => {
+  fromResults.push({ data: [{ work_id: 'W1' }], error: null })
+  expect(await api.listRegistry()).toEqual([{ work_id: 'W1' }])
+  expect(mockSupabase.from).toHaveBeenCalledTimes(1)
+})
