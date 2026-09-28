@@ -7,6 +7,18 @@ function unwrap({ data, error }) {
   return data
 }
 
+// Supabase(PostgREST)는 한 번에 최대 1000행만 돌려준다 — 끝까지 나눠 받는다.
+// build는 매번 새 쿼리를 만들어야 하고, 페이지 경계가 흔들리지 않게 고유 열로 정렬해야 한다.
+const PAGE_SIZE = 1000
+async function selectAll(build) {
+  const rows = []
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const chunk = unwrap(await build().range(from, from + PAGE_SIZE - 1))
+    rows.push(...chunk)
+    if (chunk.length < PAGE_SIZE) return rows
+  }
+}
+
 // ---------- volumes ----------
 
 export async function listVolumes() {
@@ -44,16 +56,16 @@ export async function getBoard(volumeId) {
 
 // 중복 수록 뱃지용: 전체 권의 수록 현황 (권 번호 포함)
 export async function listAllVolumeWorks() {
-  return unwrap(
-    await supabase.from('volume_works')
-      .select('id, volume_id, work_id, part_id, sort_order, selection_status, work_snapshot, volumes(number, title)'),
-  )
+  return selectAll(() => supabase.from('volume_works')
+    .select('id, volume_id, work_id, part_id, sort_order, selection_status, work_snapshot, volumes(number, title)')
+    .order('id'))
 }
 
 // ---------- works_registry ----------
 
+// 2026-09-28: 레지스트리가 1000행을 넘어(1102) 뒤쪽 작품이 화면에서 빠지던 문제 — 나눠 받는다
 export async function listRegistry() {
-  return unwrap(await supabase.from('works_registry').select('*'))
+  return selectAll(() => supabase.from('works_registry').select('*').order('work_id'))
 }
 
 // 맵에서 찾으면 기존 ID. 없으면 insert — 동시 등록 경합(23505)이면 재조회.
@@ -273,7 +285,7 @@ export async function addLibraryLink(name, url, volumeId = null) {
 // ---------- genre_picks (갈래별 후보 — 권 배치 전 롱리스트) ----------
 
 export async function listPicks() {
-  return unwrap(await supabase.from('genre_picks').select('*').order('created_at'))
+  return selectAll(() => supabase.from('genre_picks').select('*').order('created_at').order('id'))
 }
 
 export async function addPick({ work, curricula, registryMap }) {
