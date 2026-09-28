@@ -12,6 +12,7 @@ export default function SearchPane({ works, duplicatesByKey, onAdd, pickKeys = n
   const [genre, setGenre] = useState([])
   const [sortByCount, setSortByCount] = useState(false)
   const [onlyPicks, setOnlyPicks] = useState(true)
+  const [onlyUnplaced, setOnlyUnplaced] = useState(false)
 
   const curriculumOptions = useMemo(() => sortCurricula(getUniqueValues(works, '교육과정')), [works])
   const genreOptions = useMemo(() => getUniqueValues(works, '장르'), [works])
@@ -38,6 +39,11 @@ export default function SearchPane({ works, duplicatesByKey, onAdd, pickKeys = n
     if (pickKeys && onlyPicks) {
       entries = entries.filter(([key]) => pickKeys.has(key))
     }
+    // 미배치 = 어느 권에도 없거나 모두 '제외' 상태 (제외 작품은 다른 권에 재배치 가능)
+    if (onlyUnplaced) {
+      entries = entries.filter(([key]) =>
+        !(duplicatesByKey.get(key) || []).some(d => d.selection_status !== 'excluded'))
+    }
     if (sortByCount) {
       entries.sort((a, b) => (countsByKey.get(b[0]) || 0) - (countsByKey.get(a[0]) || 0))
     } else {
@@ -47,7 +53,7 @@ export default function SearchPane({ works, duplicatesByKey, onAdd, pickKeys = n
         (a[1].rep._authorBase ?? '').localeCompare(b[1].rep._authorBase ?? '', 'ko'))
     }
     return entries
-  }, [works, curriculum, genre, query, sortByCount, countsByKey, pickKeys, onlyPicks])
+  }, [works, curriculum, genre, query, sortByCount, countsByKey, pickKeys, onlyPicks, onlyUnplaced, duplicatesByKey])
 
   return (
     <div className="flex h-full flex-col">
@@ -64,13 +70,17 @@ export default function SearchPane({ works, duplicatesByKey, onAdd, pickKeys = n
 
       <div className="mb-1 flex items-center gap-3">
         <p className="text-xs text-gray-400">작품 {grouped.length}건</p>
+        <label className="ml-auto flex items-center gap-1 text-xs text-gray-500">
+          <input type="checkbox" checked={onlyUnplaced} onChange={e => setOnlyUnplaced(e.target.checked)} />
+          미배치만
+        </label>
         {pickKeys && (
-          <label className="ml-auto flex items-center gap-1 text-xs text-gray-500">
+          <label className="flex items-center gap-1 text-xs text-gray-500">
             <input type="checkbox" checked={onlyPicks} onChange={e => setOnlyPicks(e.target.checked)} />
             갈래 후보만
           </label>
         )}
-        <label className={`flex items-center gap-1 text-xs text-gray-500 ${pickKeys ? '' : 'ml-auto'}`}>
+        <label className="flex items-center gap-1 text-xs text-gray-500">
           <input type="checkbox" checked={sortByCount} onChange={e => setSortByCount(e.target.checked)} />
           수록 많은 순
         </label>

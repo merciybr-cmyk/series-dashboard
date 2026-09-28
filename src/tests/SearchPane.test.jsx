@@ -81,3 +81,20 @@ test("pickKeys가 있으면 '갈래 후보만'이 기본 적용되고 해제 시
   await userEvent.click(screen.getByLabelText('갈래 후보만'))
   expect(screen.getAllByRole('button', { name: '추가' })).toHaveLength(2)
 })
+
+test("'미배치만'을 켜면 제외 외 상태로 권에 들어간 작품을 숨긴다", async () => {
+  const works = [
+    ...WORKS,
+    { '작품명': '진달래꽃', '지은이': '김소월', _authorBase: '김소월', '장르': '현대시', '교육과정': '2015', _titleChosung: 'ㅈㄷㄹㄲ', _authorChosung: 'ㄱㅅㅇ' },
+  ]
+  const dup = new Map([
+    [workKeyOf(WORKS[0]), [{ volumeNumber: 1, selection_status: 'candidate' }]], // 소나기: 배치됨
+    [workKeyOf(works[3]), [{ volumeNumber: 2, selection_status: 'excluded' }]],  // 진달래꽃: 제외만 → 미배치
+  ])
+  render(<SearchPane works={works} duplicatesByKey={dup} onAdd={() => {}} />)
+  expect(screen.getAllByRole('button', { name: '추가' })).toHaveLength(3)
+  await userEvent.click(screen.getByLabelText('미배치만'))
+  expect(screen.getAllByRole('button', { name: '추가' })).toHaveLength(2)
+  expect(screen.queryByText('소나기')).not.toBeInTheDocument()
+  expect(screen.getByText('진달래꽃')).toBeInTheDocument()
+})
