@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest'
 import {
-  taskUrgency, urgencyIcon, sortMyTasks, buildAttention, volumeProgress, describeActivity,
+  taskUrgency, urgencyIcon, sortMyTasks, buildAttention, volumeProgress, describeActivity, groupActivity,
 } from '../board/homeUtils.js'
 
 const NOW = new Date(2026, 7, 25) // 2026-08-25
@@ -105,5 +105,49 @@ describe('describeActivity', () => {
     expect(describeActivity(
       { table_name: 'schedules', action: 'update', diff: { done: [false, true] }, actor_id: 'm1' }, nameOf,
     )).toBe('윤보라님이 일정을 완료 처리했습니다')
+  })
+
+  test('작성자가 없으면 DB 직접 수정, 명단에 없으면 알 수 없는 사용자', () => {
+    const nameOf = () => undefined
+    expect(describeActivity({ table_name: 'volumes', action: 'update', diff: {}, actor_id: null }, nameOf))
+      .toBe('DB 직접 수정으로 권 정보를 변경했습니다')
+    expect(describeActivity({ table_name: 'volumes', action: 'update', diff: {}, actor_id: 'gone' }, nameOf))
+      .toBe('알 수 없는 사용자님이 권 정보를 변경했습니다')
+  })
+})
+
+describe('groupActivity', () => {
+  const nameOf = id => ({ m1: '윤보라', m2: '최홍원' })[id]
+  const at = min => new Date(Date.UTC(2026, 8, 28, 5, min)).toISOString()
+  const vw = (id, action, batch, title, genre, min, actor = 'm1') => ({
+    id, table_name: 'volume_works', action, actor_id: actor, created_at: at(min),
+    diff: { placement_batch_id: batch, work_snapshot: { title, genre } },
+  })
+
+  test('자동 배치 묶음은 한 줄로 (추가·되돌리기)', () => {
+    const entries = [ // 최신순
+      vw(9, 'delete', 'b1', '풀', '시', 30), vw(8, 'delete', 'b1', '서시', '시', 30),
+      vw(7, 'insert', 'b1', '풀', '시', 10), vw(6, 'insert', 'b1', '서시', '시', 10), vw(5, 'insert', 'b1', '가시리', '고전운문', 10),
+    ]
+    expect(groupActivity(entries, nameOf).map(g => g.text)).toEqual([
+      '윤보라님이 자동 배치를 되돌려 현대시 2편을 제거했습니다',
+      '윤보라님이 자동 배치로 현대시·고전운문 3편을 추가했습니다',
+    ])
+  })
+
+  test('같은 사람·같은 문구가 10분 안에 이어지면 (N건)으로 합친다', () => {
+    const upd = (id, min, actor = null) => ({ id, table_name: 'volumes', action: 'update', diff: {}, actor_id: actor, created_at: at(min) })
+    const entries = [upd(5, 7), upd(4, 7), upd(3, 7), upd(2, 7, 'm2'), upd(1, 0, 'm2')]
+    expect(groupActivity(entries, nameOf).map(g => g.text)).toEqual([
+      'DB 직접 수정으로 권 정보를 변경했습니다 (3건)',
+      '최홍원님이 권 정보를 변경했습니다 (2건)',
+    ])
+  })
+
+  test('손으로 추가한 작품(묶음 없음)은 제목이 달라 따로 보이고, limit만큼만 돌려준다', () => {
+    const entries = [vw(3, 'insert', null, '풀', '시', 3), vw(2, 'insert', null, '서시', '시', 2), vw(1, 'insert', null, '향수', '시', 1)]
+    const out = groupActivity(entries, nameOf, 2)
+    expect(out.map(g => g.text)).toEqual(['윤보라님이 「풀」을(를) 추가했습니다', '윤보라님이 「서시」을(를) 추가했습니다'])
+    expect(out[0]).toMatchObject({ id: 3, created_at: at(3) })
   })
 })
