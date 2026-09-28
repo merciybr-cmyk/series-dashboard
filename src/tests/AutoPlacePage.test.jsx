@@ -118,3 +118,9 @@ test('phase5.sql 미실행이면 안내한다', async () => {
   renderPage()
   await waitFor(() => expect(screen.getByText(/phase5\.sql/)).toBeInTheDocument())
 })
+
+test('콘셉트 태그가 없는 미배치 후보 수를 안내한다', async () => {
+  renderPage()
+  await waitFor(() => expect(screen.getByText(/콘셉트 태그가 없는 후보 3편/)).toBeInTheDocument())
+  expect(screen.getByRole('link', { name: '갈래별 후보에서 달기' })).toHaveAttribute('href', '#/picks')
+})

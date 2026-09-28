@@ -1,6 +1,7 @@
 // 홈 화면 집계 순수 함수 (설계 §5.2). 화면과 분리해 유닛 테스트한다.
 import { daysUntil, dDayLabel } from './boardUtils.js'
 import { SELECTION_LABELS } from './constants.js'
+import { bucketOf } from './genreUtils.js'
 
 export function taskUrgency(dueDate, now = new Date()) {
   if (!dueDate) return 'none'
@@ -78,8 +79,14 @@ export function volumeProgress(volumes, allVw, allTasks) {
   })
 }
 
+// 작성자가 없는 기록은 Supabase Studio 등에서 DB를 직접 고친 것 (2026-09-28)
+function actorLabel(actorId, nameOf) {
+  if (!actorId) return 'DB 직접 수정으로'
+  return `${nameOf(actorId) || '알 수 없는 사용자'}님이`
+}
+
 export function describeActivity(entry, nameOf) {
-  const name = `${nameOf(entry.actor_id) || '누군가'}님이`
+  const name = actorLabel(entry.actor_id, nameOf)
   const d = entry.diff || {}
   const t = entry.table_name
   const a = entry.action
@@ -121,4 +128,54 @@ export function describeActivity(entry, nameOf) {
     if (a === 'update') return `${name} 일정을 변경했습니다`
   }
   return `${name} 항목을 변경했습니다`
+}
+
+// 최근 활동 묶기 (2026-09-28): entries는 최신순.
+// - 자동 배치 묶음(placement_batch_id)의 추가·제거는 한 줄로
+// - 같은 사람의 같은 문구가 10분 안에 이어지면 "(N건)"으로 합친다
+const SAME_RUN_MS = 10 * 60 * 1000
+
+function batchIdOf(entry) {
+  if (entry.table_name !== 'volume_works') return null
+  if (entry.action !== 'insert' && entry.action !== 'delete') return null
+  return entry.diff?.placement_batch_id || null
+}
+
+export function groupActivity(entries, nameOf, limit = 20) {
+  const groups = []
+  for (const e of entries) {
+    const batch = batchIdOf(e)
+    const bucket = batch ? bucketOf(e.diff?.work_snapshot?.genre) : null
+    const text = batch ? null : describeActivity(e, nameOf)
+    const time = new Date(e.created_at).getTime()
+    const last = groups[groups.length - 1]
+    if (last && batch && last.batch === batch && last.action === e.action) {
+      last.count++
+      if (bucket) last.buckets.add(bucket)
+      continue
+    }
+    if (last && !batch && !last.batch && last.text === text && last.actor === e.actor_id
+      && last.oldest - time <= SAME_RUN_MS) {
+      last.count++
+      last.oldest = time
+      continue
+    }
+    groups.push({
+      id: e.id, created_at: e.created_at, actor: e.actor_id, action: e.action,
+      batch, text, count: 1, oldest: time, buckets: new Set(bucket ? [bucket] : []),
+    })
+  }
+  return groups.slice(0, limit).map(g => {
+    let text = g.text
+    if (g.batch) {
+      const who = actorLabel(g.actor, nameOf)
+      const genre = [...g.buckets].join('·') || '작품'
+      text = g.action === 'insert'
+        ? `${who} 자동 배치로 ${genre} ${g.count}편을 추가했습니다`
+        : `${who} 자동 배치를 되돌려 ${genre} ${g.count}편을 제거했습니다`
+    } else if (g.count > 1) {
+      text = `${text} (${g.count}건)`
+    }
+    return { id: g.id, created_at: g.created_at, text }
+  })
 }

@@ -4,10 +4,13 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider.jsx'
 import * as api from '../board/volumeApi.js'
 import {
-  taskUrgency, urgencyIcon, sortMyTasks, buildAttention, volumeProgress, describeActivity,
+  taskUrgency, urgencyIcon, sortMyTasks, buildAttention, volumeProgress, groupActivity,
 } from '../board/homeUtils.js'
 import { daysUntil, dDayLabel } from '../board/boardUtils.js'
 import { useToast } from '../components/Toast.jsx'
+
+// 자동 배치처럼 한 번에 수십 건이 쌓여도 묶은 뒤 20줄을 채울 수 있게 넉넉히 가져온다
+const ACTIVITY_FETCH = 300
 
 function Card({ title, children }) {
   return (
@@ -54,7 +57,7 @@ export default function HomePage() {
     try {
       const [volumes, vworks, tasks, files, activity, members, schedules] = await Promise.all([
         api.listVolumes(), api.listAllVolumeWorks(), api.listAllTasks(),
-        api.listAllFiles(), api.listActivity(20), api.listMembers(), api.listSchedules(),
+        api.listAllFiles(), api.listActivity(ACTIVITY_FETCH), api.listMembers(), api.listSchedules(),
       ])
       setData({ volumes, vworks, tasks, files, activity, members, schedules })
     } catch (err) {
@@ -95,10 +98,10 @@ export default function HomePage() {
     const upcoming = [...upcomingTasks, ...upcomingSchedules]
       .sort((a, b) => a.due_date.localeCompare(b.due_date))
     const progress = volumeProgress(data.volumes, data.vworks, data.tasks)
-    const feed = data.activity.map(e => ({
-      id: e.id,
-      when: new Date(e.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-      text: describeActivity(e, nameOf),
+    const feed = groupActivity(data.activity, nameOf, 20).map(g => ({
+      id: g.id,
+      when: new Date(g.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      text: g.text,
     }))
     return { myTasks, attention, upcoming, progress, feed }
   }, [data, member])

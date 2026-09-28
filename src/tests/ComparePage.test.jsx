@@ -8,7 +8,9 @@ vi.mock('../board/volumeApi.js', () => ({
   listAllVolumeWorks: vi.fn(),
   listAllParts: vi.fn(),
 }))
+vi.mock('../board/exportCompare.js', () => ({ downloadCompareExcel: vi.fn() }))
 const api = await import('../board/volumeApi.js')
+const { downloadCompareExcel } = await import('../board/exportCompare.js')
 const { default: ComparePage } = await import('../board/ComparePage.jsx')
 const { ToastProvider } = await import('../components/Toast.jsx')
 
@@ -49,4 +51,15 @@ test("'확정만 보기'가 후보를 숨긴다", async () => {
   await userEvent.click(screen.getByLabelText('확정만 보기'))
   expect(screen.queryByText('산유화')).not.toBeInTheDocument()
   expect(screen.getAllByText('소나기')).toHaveLength(1)      // v1의 확정본만
+})
+
+test("'엑셀로 저장'은 화면의 '확정만 보기' 상태 그대로 내려받는다", async () => {
+  api.listVolumes.mockResolvedValue(VOLUMES)
+  api.listAllVolumeWorks.mockResolvedValue(VW)
+  api.listAllParts.mockResolvedValue(PARTS)
+  renderPage()
+  await waitFor(() => screen.getByText('산유화'))
+  await userEvent.click(screen.getByLabelText('확정만 보기'))
+  await userEvent.click(screen.getByRole('button', { name: '엑셀로 저장' }))
+  expect(downloadCompareExcel).toHaveBeenCalledWith({ volumes: VOLUMES, allVw: VW, allParts: PARTS, confirmedOnly: true })
 })

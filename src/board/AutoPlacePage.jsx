@@ -151,6 +151,7 @@ export default function AutoPlacePage() {
   if (!view) return <p className="text-gray-500">불러오는 중…</p>
 
   const proposedCount = view.columns.reduce((n, c) => n + c.proposed.length, 0)
+  const untaggedCount = input.works.filter(w => !w.conceptVolumeIds.length).length
 
   return (
     <div>
@@ -197,6 +198,12 @@ export default function AutoPlacePage() {
       {input.skippedVolumes.length > 0 && (
         <p className="mb-2 text-sm text-amber-700">
           교육과정기가 비어 있어 제외한 권: {input.skippedVolumes.map(v => `${v.number}권`).join(', ')} — 권 목록의 수정에서 설정하세요.
+        </p>
+      )}
+      {untaggedCount > 0 && (
+        <p className="mb-2 text-sm text-purple-700">
+          콘셉트 태그가 없는 후보 {untaggedCount}편은 첫 수록 시기와 분량으로만 배치됩니다.{' '}
+          <Link to="/picks" className="underline">갈래별 후보에서 달기</Link>
         </p>
       )}
       {(sheetError || input.sheetFallbackCount > 0) && (
