@@ -92,3 +92,15 @@ test('splitUndoable: 상태 변경·업무·의견·자료가 있으면 남긴�
   expect(removable.map(r => r.id)).toEqual(['a'])
   expect(kept.map(k => [k.row.id, k.reason])).toEqual([['b', 'status'], ['c', 'tasks'], ['d', 'comments'], ['e', 'files']])
 })
+
+test('evaluateAssignment: 작자 미상은 작가 중복 경고를 달지 않는다', () => {
+  const works = [
+    { workId: 'A', title: '가시리', author: '', curricula: ['5차'], conceptVolumeIds: [] },
+    { workId: 'B', title: '동동', author: '', curricula: ['5차'], conceptVolumeIds: [] },
+    { workId: 'C', title: '서경별곡', author: '', curricula: ['5차'], conceptVolumeIds: [] },
+  ]
+  const vol = { id: 'v3', number: 3, title: '5차', curricula: ['5차'] }
+  const assignment = new Map([['A', 'v3'], ['B', 'v3'], ['C', 'v3']])
+  const { columns } = evaluateAssignment({ works, volumes: [vol], existing: [], bucket: '고전운문', assignment })
+  expect(columns[0].proposed.map(p => p.warnings)).toEqual([[], [], []])
+})

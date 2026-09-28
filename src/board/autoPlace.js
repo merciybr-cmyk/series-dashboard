@@ -16,6 +16,12 @@ export const AUTHOR_LIMIT = 2
 const MAX_PASSES = 50
 const EPS = 1e-9
 
+// 작자 미상(빈 값·'미상' 표기)은 작품마다 다른 작가로 본다 — 작가 중복 제한·감점에서 제외 (2026-09-28 고전운문)
+export function isKnownAuthor(author) {
+  const a = (author || '').replace(/\s+/g, '')
+  return a !== '' && !/^(작자|작가)?미상$/.test(a)
+}
+
 export function firstCurriculum(curricula) {
   return sortCurricula(curricula || [])[0] ?? null
 }
@@ -58,8 +64,8 @@ export function autoPlace({ works, volumes, existing = [], bucket }) {
   // 상태: 권별 같은 갈래 편수, (권·작가)별 편수(모든 갈래)
   const size = new Map(volumes.map(v => [v.id, 0]))
   const authors = new Map()
-  const countAuthor = (vid, a) => authors.get(authorKey(vid, a)) || 0
-  const addAuthor = (vid, a, d) => authors.set(authorKey(vid, a), countAuthor(vid, a) + d)
+  const countAuthor = (vid, a) => (isKnownAuthor(a) ? authors.get(authorKey(vid, a)) || 0 : 0)
+  const addAuthor = (vid, a, d) => { if (isKnownAuthor(a)) authors.set(authorKey(vid, a), countAuthor(vid, a) + d) }
   for (const e of active) {
     if (e.bucket === bucket) size.set(e.volumeId, size.get(e.volumeId) + 1)
     addAuthor(e.volumeId, e.author, 1)
