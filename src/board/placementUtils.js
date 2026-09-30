@@ -6,6 +6,14 @@ import { AUTHOR_LIMIT, firstCurriculum, isEligible, isKnownAuthor, reasonsFor } 
 // 갈래 → 부 번호 (고전산문은 2·3부 어느 쪽도 가능해 미배정 — 2026-09-28 사용자 결정)
 export const PART_BY_BUCKET = { '현대시': 1, '고전운문': 1, '현대소설': 2, '현대수필·극': 3, '고전산문': null }
 export const PART_TITLE = { 1: '시', 2: '소설', 3: '수필·극' }
+
+// 2026-09-30: 시트가 고전산문을 고전소설·고전수필·고전극으로 나눠, 고전산문은 작품 갈래로 부를 정한다
+// (사용자 결정: 고전소설 → 2부, 고전수필·고전극 → 3부. 세분화 이전의 '고전산문' 표기는 계속 미배정)
+const PROSE_PART_BY_GENRE = { '고전소설': 2, '고전수필': 3, '고전극': 3 }
+export function partNumberFor(bucket, genre) {
+  if (bucket === '고전산문') return PROSE_PART_BY_GENRE[(genre || '').trim()] ?? null
+  return PART_BY_BUCKET[bucket] ?? null
+}
 export const REASON_LABELS = { debut: '첫 수록', concept: '콘셉트', balance: '균형' }
 export const UNPLACEABLE_LABELS = {
   noEligibleVolume: '수록 교육과정에 맞는 권 없음',

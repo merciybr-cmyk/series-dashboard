@@ -1,17 +1,27 @@
 // 자동 배치 적용·되돌리기 절차 (설계 2026-09-28 §3.5·§3.6). api를 주입받아 테스트한다.
-import { PART_BY_BUCKET, PART_TITLE, splitUndoable } from './placementUtils.js'
+import { PART_TITLE, partNumberFor, splitUndoable } from './placementUtils.js'
 import { SELECTION_LABELS } from './constants.js'
 
 const SORT_STEP = 10
 const KEEP_LABEL = { tasks: '업무 있음', comments: '의견 있음', files: '자료 있음' }
 
+// 작품이 들어갈 부 번호 (갈래 묶음 기준, 고전산문은 작품 갈래 기준)
+const partNumberOfItem = (bucket, item) => partNumberFor(bucket, item.work.snapshot?.genre)
+
+// 권·부 번호 쌍 (중복 제거, 부 번호 없는 작품 제외)
+function neededParts(bucket, items) {
+  const seen = new Map()
+  for (const it of items) {
+    const number = partNumberOfItem(bucket, it)
+    if (number) seen.set(`${it.volumeId}|${number}`, { volumeId: it.volumeId, number })
+  }
+  return [...seen.values()]
+}
+
 // 적용 확인 창용: 새로 만들어야 할 부
 export function plannedNewParts({ bucket, items, parts }) {
-  const number = PART_BY_BUCKET[bucket]
-  if (!number) return []
-  return [...new Set(items.map(i => i.volumeId))]
-    .filter(vid => !parts.some(p => p.volume_id === vid && p.number === number))
-    .map(vid => ({ volumeId: vid, number }))
+  return neededParts(bucket, items)
+    .filter(n => !parts.some(p => p.volume_id === n.volumeId && p.number === n.number))
 }
 
 export function applyConfirmText({ bucket, items, volumes, newParts }) {
@@ -47,21 +57,22 @@ export async function applyPlacement({ api, bucket, items }) {
   const batch = await api.createPlacementBatch(bucket)
   result.batchId = batch.id
 
-  // 3) 부 확보
-  const number = PART_BY_BUCKET[bucket]
-  const partByVolume = new Map()
-  if (number) {
+  // 3) 부 확보 (권·부 번호마다)
+  const needed = neededParts(bucket, todo)
+  const partByKey = new Map() // `${volumeId}|${number}` → part id
+  if (needed.length) {
     const parts = await api.listAllParts()
     const createdIds = []
-    for (const vid of [...new Set(todo.map(i => i.volumeId))]) {
+    for (const { volumeId: vid, number } of needed) {
+      const key = `${vid}|${number}`
       const found = parts.find(p => p.volume_id === vid && p.number === number)
-      if (found) { partByVolume.set(vid, found.id); continue }
+      if (found) { partByKey.set(key, found.id); continue }
       try {
         const part = await api.createPart(vid, number, PART_TITLE[number])
-        partByVolume.set(vid, part.id)
+        partByKey.set(key, part.id)
         createdIds.push(part.id)
       } catch {
-        partByVolume.set(vid, null) // 부 생성 실패 — 미배정으로 넣는다
+        partByKey.set(key, null) // 부 생성 실패 — 미배정으로 넣는다
       }
     }
     if (createdIds.length) {
@@ -81,7 +92,7 @@ export async function applyPlacement({ api, bucket, items }) {
         volumeId: it.volumeId,
         workId: it.work.workId,
         workSnapshot: it.work.snapshot,
-        partId: partByVolume.get(it.volumeId) ?? null,
+        partId: partByKey.get(`${it.volumeId}|${partNumberOfItem(bucket, it)}`) ?? null,
         batchId: batch.id,
         sortOrder,
       })

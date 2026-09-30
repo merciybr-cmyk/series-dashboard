@@ -109,3 +109,22 @@ test('undoBatch: 손댄 행은 남기고, 빈 부만 지우고, 되돌림 기록
   expect(res.removedParts).toBe(1)
   expect(undoSummary(res)).toBe('1편을 뺐습니다. 2편은 남겼습니다: 〈서시〉(2권 확정), 〈향수〉(3권 의견 있음)')
 })
+
+test('고전산문은 작품 갈래로 부를 정한다: 고전소설 2부, 고전수필·고전극 3부, 레거시 고전산문은 미배정', async () => {
+  const prose = (workId, genre) => ({ workId, title: workId, snapshot: { title: workId, author: '', genre } })
+  const items = [
+    { work: prose('W1', '고전소설'), volumeId: 'v1' },
+    { work: prose('W2', '고전수필'), volumeId: 'v1' },
+    { work: prose('W3', '고전극'), volumeId: 'v1' },
+    { work: prose('W4', '고전산문'), volumeId: 'v1' },
+  ]
+  const parts = [{ id: 'p2', volume_id: 'v1', number: 2 }]
+  expect(plannedNewParts({ bucket: '고전산문', items, parts })).toEqual([{ volumeId: 'v1', number: 3 }])
+  const api = fakeApi({ listAllParts: vi.fn().mockResolvedValue(parts) })
+  const res = await applyPlacement({ api, bucket: '고전산문', items })
+  expect(api.createPart).toHaveBeenCalledTimes(1)
+  expect(api.createPart).toHaveBeenCalledWith('v1', 3, '수필·극')
+  const partOf = id => api.insertPlacedWork.mock.calls.find(([a]) => a.workId === id)[0].partId
+  expect([partOf('W1'), partOf('W2'), partOf('W3'), partOf('W4')]).toEqual(['p2', 'part-v1-3', 'part-v1-3', null])
+  expect(res.createdParts).toBe(1)
+})
