@@ -104,3 +104,13 @@ test('evaluateAssignment: 작자 미상은 작가 중복 경고를 달지 않는
   const { columns } = evaluateAssignment({ works, volumes: [vol], existing: [], bucket: '고전운문', assignment })
   expect(columns[0].proposed.map(p => p.warnings)).toEqual([[], [], []])
 })
+
+test('partNumberFor: 고전산문은 작품 갈래별, 나머지는 갈래 묶음별', async () => {
+  const { partNumberFor } = await import('../board/placementUtils.js')
+  expect(partNumberFor('현대시', '시')).toBe(1)
+  expect(partNumberFor('고전운문', '고전운문')).toBe(1)
+  expect(partNumberFor('고전산문', '고전소설')).toBe(2)
+  expect(partNumberFor('고전산문', '고전수필')).toBe(3)
+  expect(partNumberFor('고전산문', '고전극')).toBe(3)
+  expect(partNumberFor('고전산문', '고전산문')).toBeNull()
+})
