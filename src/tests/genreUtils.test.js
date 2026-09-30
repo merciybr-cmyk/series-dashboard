@@ -30,3 +30,9 @@ test('groupPicksByBucket: 버킷별로 묶고 미분류는 기타로', () => {
   expect(g['기타'].map(p => p.id)).toEqual(['c'])
   expect(g['현대소설']).toEqual([])
 })
+
+test('bucketOf: 시트의 고전소설·고전수필·고전극은 고전산문으로 묶는다 (2026-09-30 시트 갈래 세분화)', () => {
+  expect(bucketOf('고전소설')).toBe('고전산문')
+  expect(bucketOf('고전수필')).toBe('고전산문')
+  expect(bucketOf('고전극')).toBe('고전산문')
+})
