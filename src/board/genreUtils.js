@@ -1,5 +1,6 @@
 // 갈래별 후보 분류 (2026-08-26 사용자 결정: 5개 버킷)
 // 시트 갈래 → 버킷 매핑. 새 갈래가 시트에 생기면 여기에만 추가하면 된다.
+import { isKnownAuthor } from './autoPlace.js'
 
 export const GENRE_BUCKETS = ['현대시', '현대소설', '현대수필·극', '고전운문', '고전산문']
 
@@ -63,4 +64,25 @@ export function countEras(works) {
 
 export function eraSummary(counts) {
   return [...ERAS, '기타'].filter(k => counts[k] > 0).map(k => `${k} ${counts[k]}`).join(' · ')
+}
+
+// 갈래별 후보 작가별 묶기 (2026-10-01 사용자 결정 A): 작가 이름 가나다순, 같은 작가 안은 넘겨받은 순서(선정순).
+// 작가가 비었거나 '미상'이면 같은 작가로 묶지 않고 맨 끝 한 묶음(author: null)에 선정순으로 둔다.
+export function groupPicksByAuthor(picks) {
+  const byKey = new Map()
+  const unknown = []
+  for (const p of picks) {
+    const author = (p.work_snapshot?.author || '').trim()
+    if (!isKnownAuthor(author)) { unknown.push(p); continue }
+    const key = author.replace(/\s+/g, '')
+    if (!byKey.has(key)) byKey.set(key, { author, picks: [] })
+    byKey.get(key).picks.push(p)
+  }
+  const groups = [...byKey.values()].sort((a, b) => a.author.localeCompare(b.author, 'ko'))
+  if (unknown.length) groups.push({ author: null, picks: unknown })
+  return groups
+}
+
+export function orderPicksByAuthor(picks) {
+  return groupPicksByAuthor(picks).flatMap(g => g.picks)
 }

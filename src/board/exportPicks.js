@@ -2,7 +2,7 @@
 // 양식: 연번 / 작품명 / 작가명 / 갈래 / 수록 교육과정 — 머리행 파란 배경·흰색 볼드
 // xlsx-js-style: SheetJS 호환 + 셀 서식 지원 (무료판 xlsx는 서식 미지원)
 import * as XLSX from 'xlsx-js-style'
-import { GENRE_BUCKETS, groupPicksByBucket } from './genreUtils.js'
+import { GENRE_BUCKETS, groupPicksByBucket, orderPicksByAuthor } from './genreUtils.js'
 import { sortCurricula } from '../works/workKey.js'
 
 export function picksToRows(picks) {
@@ -48,13 +48,13 @@ export function buildBucketWorkbook(picks, bucket) {
   return wb
 }
 
-// 전체: 갈래별 시트로 분리 (빈 갈래는 생략)
-export function buildAllWorkbook(picks) {
+// 전체: 갈래별 시트로 분리 (빈 갈래는 생략). byAuthor면 화면의 '작가별'처럼 시트마다 작가 가나다순으로 묶는다.
+export function buildAllWorkbook(picks, { byAuthor = false } = {}) {
   const groups = groupPicksByBucket(picks)
   const wb = XLSX.utils.book_new()
   for (const b of [...GENRE_BUCKETS, '기타']) {
     if (!groups[b]?.length) continue
-    XLSX.utils.book_append_sheet(wb, sheetOf(groups[b]), safeSheetName(b))
+    XLSX.utils.book_append_sheet(wb, sheetOf(byAuthor ? orderPicksByAuthor(groups[b]) : groups[b]), safeSheetName(b))
   }
   return wb
 }
@@ -68,6 +68,6 @@ export function downloadBucketExcel(picks, bucket) {
   XLSX.writeFile(buildBucketWorkbook(picks, bucket), `갈래별 후보_${bucket}_${today()}.xlsx`)
 }
 
-export function downloadAllExcel(picks) {
-  XLSX.writeFile(buildAllWorkbook(picks), `갈래별 후보_전체_${today()}.xlsx`)
+export function downloadAllExcel(picks, options) {
+  XLSX.writeFile(buildAllWorkbook(picks, options), `갈래별 후보_전체_${today()}.xlsx`)
 }

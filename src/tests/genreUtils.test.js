@@ -1,4 +1,4 @@
-import { GENRE_BUCKETS, bucketOf, groupPicksByBucket, eraOf, orderByEra, countEras, eraSummary } from '../board/genreUtils.js'
+import { GENRE_BUCKETS, bucketOf, groupPicksByBucket, eraOf, orderByEra, countEras, eraSummary, groupPicksByAuthor, orderPicksByAuthor } from '../board/genreUtils.js'
 
 test('GENRE_BUCKETS: 5개 분류', () => {
   expect(GENRE_BUCKETS).toEqual(['현대시', '현대소설', '현대수필·극', '고전운문', '고전산문'])
@@ -64,4 +64,26 @@ test('eraSummary: 0인 항목은 빼고 가운뎃점으로 잇는다', () => {
   expect(eraSummary({ '고전': 0, '현대': 4, '기타': 0 })).toBe('현대 4')
   expect(eraSummary({ '고전': 1, '현대': 0, '기타': 2 })).toBe('고전 1 · 기타 2')
   expect(eraSummary({ '고전': 0, '현대': 0, '기타': 0 })).toBe('')
+})
+
+const pk = (id, author) => ({ id, work_snapshot: { title: id, author, genre: '시' } })
+
+test('groupPicksByAuthor: 작가 이름 가나다순, 같은 작가 안은 넘겨받은(선정) 순서', () => {
+  const picks = [pk('a', '정지용'), pk('b', '김소월'), pk('c', '백석'), pk('d', '김소월'), pk('e', '정지용 ')]
+  const groups = groupPicksByAuthor(picks)
+  expect(groups.map(g => g.author)).toEqual(['김소월', '백석', '정지용'])
+  expect(groups.map(g => g.picks.map(p => p.id))).toEqual([['b', 'd'], ['c'], ['a', 'e']]) // 앞뒤 공백은 같은 작가로
+})
+
+test('groupPicksByAuthor: 작가가 비었거나 미상이면 묶지 않고 맨 끝(author null)에 선정순으로', () => {
+  const picks = [pk('a', '미상'), pk('b', '허균'), pk('c', ''), pk('d', '작자 미상'), pk('e', undefined)]
+  const groups = groupPicksByAuthor(picks)
+  expect(groups.map(g => g.author)).toEqual(['허균', null])
+  expect(groups[1].picks.map(p => p.id)).toEqual(['a', 'c', 'd', 'e'])
+  expect(groupPicksByAuthor([])).toEqual([])
+})
+
+test('orderPicksByAuthor: 묶음 순서대로 펼친 목록', () => {
+  const picks = [pk('a', '정지용'), pk('b', ''), pk('c', '김소월'), pk('d', '정지용')]
+  expect(orderPicksByAuthor(picks).map(p => p.id)).toEqual(['c', 'a', 'd', 'b'])
 })

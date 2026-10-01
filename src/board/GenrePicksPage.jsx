@@ -1,9 +1,9 @@
 // 갈래별 후보: 권 배치 전에 갈래별로 수록할 만한 작품을 먼저 뽑아 두는 화면 (2026-08-26)
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { useWorksData } from '../works/useWorksData.js'
 import { buildRegistryMap, keyOf } from '../works/workKey.js'
 import * as api from './volumeApi.js'
-import { GENRE_BUCKETS, groupPicksByBucket, bucketOf } from './genreUtils.js'
+import { GENRE_BUCKETS, groupPicksByBucket, bucketOf, groupPicksByAuthor } from './genreUtils.js'
 import { sortCurricula } from '../works/workKey.js'
 import { downloadBucketExcel, downloadAllExcel } from './exportPicks.js'
 import { SELECTION_LABELS } from './constants.js'
@@ -22,6 +22,7 @@ export default function GenrePicksPage() {
   const [loading, setLoading] = useState(true)
   const [activeBucket, setActiveBucket] = useState(GENRE_BUCKETS[0])
   const [onlyUntagged, setOnlyUntagged] = useState(false)
+  const [byAuthor, setByAuthor] = useState(true) // 2026-10-01: 기본은 같은 작가끼리 묶어 보기(작가 가나다순)
 
   const load = useCallback(() => {
     api.listPicks().then(setPicks).catch(err => show(err.message)).finally(() => setLoading(false))
@@ -100,6 +101,51 @@ export default function GenrePicksPage() {
   const untagged = bucketPicks.filter(p => 'concept_volume_ids' in p && !(p.concept_volume_ids || []).length)
   const hasTags = bucketPicks.some(p => 'concept_volume_ids' in p)
   const activePicks = onlyUntagged ? untagged : bucketPicks
+  const displayGroups = byAuthor ? groupPicksByAuthor(activePicks) : [{ author: null, picks: activePicks }]
+  const orderedPicks = displayGroups.flatMap(g => g.picks) // 엑셀도 화면 순서 그대로
+
+  function renderPick(p) {
+    const dups = duplicatesByWorkId.get(p.work_id) || []
+    return (
+      <li key={p.id} className="flex items-center gap-2 rounded border border-gray-100 px-3 py-2 text-sm">
+        <div className="min-w-0 flex-1">
+          <div className="truncate">
+            <span className="font-medium">{p.work_snapshot?.title}</span>
+            <span className="ml-2 text-xs text-gray-500">
+              {p.work_snapshot?.author} · {p.work_snapshot?.genre}
+            </span>
+          </div>
+          {(p.work_snapshot?.curriculum || []).length > 0 && (
+            <div className="truncate text-xs text-gray-400" title={sortCurricula(p.work_snapshot.curriculum).join(', ')}>
+              {sortCurricula(p.work_snapshot.curriculum).join(' · ')}
+            </div>
+          )}
+        </div>
+        {'concept_volume_ids' in p && (
+          <ConceptTags
+            title={p.work_snapshot?.title}
+            volumeIds={p.concept_volume_ids || []}
+            volumes={volumes}
+            onSave={ids => handleConcept(p, ids)}
+          />
+        )}
+        {dups.map((d, i) => (
+          <span
+            key={`${d.volumeNumber}-${i}`}
+            className={`shrink-0 rounded px-1.5 py-0.5 text-xs ${d.selection_status === 'confirmed' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}
+          >
+            {d.volumeNumber}권 {SELECTION_LABELS[d.selection_status]}
+          </span>
+        ))}
+        <button
+          type="button"
+          aria-label={`${p.work_snapshot?.title} 제거`}
+          onClick={() => handleRemove(p)}
+          className="shrink-0 text-gray-300 hover:text-red-500"
+        >✕</button>
+      </li>
+    )
+  }
 
   return (
     <div>
@@ -111,14 +157,14 @@ export default function GenrePicksPage() {
         <div className="ml-auto flex gap-2">
           <button
             type="button"
-            onClick={() => (activePicks.length ? downloadBucketExcel(activePicks, activeBucket) : show('현재 갈래에 후보가 없습니다'))}
+            onClick={() => (orderedPicks.length ? downloadBucketExcel(orderedPicks, activeBucket) : show('현재 갈래에 후보가 없습니다'))}
             className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-600 hover:bg-gray-50"
           >
             현재 갈래 엑셀
           </button>
           <button
             type="button"
-            onClick={() => (picks.length ? downloadAllExcel(picks) : show('내보낼 후보가 없습니다'))}
+            onClick={() => (picks.length ? downloadAllExcel(picks, { byAuthor }) : show('내보낼 후보가 없습니다'))}
             className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-600 hover:bg-gray-50"
           >
             전체 엑셀 (갈래별 시트)
@@ -157,63 +203,49 @@ export default function GenrePicksPage() {
                 {b} {groups[b]?.length ? `(${groups[b].length})` : ''}
               </button>
             ))}
-            {hasTags && (untagged.length > 0 || onlyUntagged) && (
-              <button
-                type="button"
-                aria-pressed={onlyUntagged}
-                onClick={() => setOnlyUntagged(v => !v)}
-                className={`ml-auto rounded border px-2 py-1 text-xs ${
-                  onlyUntagged ? 'border-purple-600 bg-purple-600 text-white' : 'border-purple-300 text-purple-700 hover:bg-purple-50'
-                }`}
-              >
-                태그 없음 {untagged.length}
-              </button>
-            )}
+            <div className="ml-auto flex items-center gap-2">
+              <div className="flex overflow-hidden rounded border border-gray-300 text-xs" role="group" aria-label="정렬">
+                {[[true, '작가별'], [false, '선정순']].map(([value, label]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    aria-pressed={byAuthor === value}
+                    onClick={() => setByAuthor(value)}
+                    className={`px-2 py-1 ${byAuthor === value ? 'bg-gray-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {hasTags && (untagged.length > 0 || onlyUntagged) && (
+                <button
+                  type="button"
+                  aria-pressed={onlyUntagged}
+                  onClick={() => setOnlyUntagged(v => !v)}
+                  className={`rounded border px-2 py-1 text-xs ${
+                    onlyUntagged ? 'border-purple-600 bg-purple-600 text-white' : 'border-purple-300 text-purple-700 hover:bg-purple-50'
+                  }`}
+                >
+                  태그 없음 {untagged.length}
+                </button>
+              )}
+            </div>
           </div>
 
           <ul className="space-y-1">
-            {activePicks.map(p => {
-              const dups = duplicatesByWorkId.get(p.work_id) || []
-              return (
-                <li key={p.id} className="flex items-center gap-2 rounded border border-gray-100 px-3 py-2 text-sm">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate">
-                      <span className="font-medium">{p.work_snapshot?.title}</span>
-                      <span className="ml-2 text-xs text-gray-500">
-                        {p.work_snapshot?.author} · {p.work_snapshot?.genre}
-                      </span>
-                    </div>
-                    {(p.work_snapshot?.curriculum || []).length > 0 && (
-                      <div className="truncate text-xs text-gray-400" title={sortCurricula(p.work_snapshot.curriculum).join(', ')}>
-                        {sortCurricula(p.work_snapshot.curriculum).join(' · ')}
-                      </div>
-                    )}
-                  </div>
-                  {'concept_volume_ids' in p && (
-                    <ConceptTags
-                      title={p.work_snapshot?.title}
-                      volumeIds={p.concept_volume_ids || []}
-                      volumes={volumes}
-                      onSave={ids => handleConcept(p, ids)}
-                    />
-                  )}
-                  {dups.map((d, i) => (
-                    <span
-                      key={`${d.volumeNumber}-${i}`}
-                      className={`shrink-0 rounded px-1.5 py-0.5 text-xs ${d.selection_status === 'confirmed' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}
-                    >
-                      {d.volumeNumber}권 {SELECTION_LABELS[d.selection_status]}
-                    </span>
-                  ))}
-                  <button
-                    type="button"
-                    aria-label={`${p.work_snapshot?.title} 제거`}
-                    onClick={() => handleRemove(p)}
-                    className="shrink-0 text-gray-300 hover:text-red-500"
-                  >✕</button>
-                </li>
-              )
-            })}
+            {displayGroups.map((g, gi) => (g.author && g.picks.length > 1 ? (
+              // 2편 이상인 작가: 머리줄 + 왼쪽 세로줄로 묶음의 끝까지 보이게
+              <li key={g.author} data-author-group className="pt-1">
+                <div data-author-header className="flex items-baseline gap-1.5 px-1 pb-1 text-sm font-semibold text-gray-700">
+                  <span>{g.author}</span>
+                  <span className="text-xs font-normal text-gray-400">{g.picks.length}편</span>
+                </div>
+                <ul className="ml-1 space-y-1 border-l-2 border-gray-300 pl-2">{g.picks.map(renderPick)}</ul>
+              </li>
+            ) : (
+              // 1편뿐인 작가·작가 미상·선정순은 머리줄 없이
+              <Fragment key={g.author ?? `none-${gi}`}>{g.picks.map(renderPick)}</Fragment>
+            )))}
             {!activePicks.length && (
               <li className="py-8 text-center text-sm text-gray-400">
                 아직 이 갈래의 후보가 없습니다 — 왼쪽에서 검색해 추가하세요
