@@ -68,11 +68,11 @@ test('eraSummary: 0인 항목은 빼고 가운뎃점으로 잇는다', () => {
 
 const pk = (id, author) => ({ id, work_snapshot: { title: id, author, genre: '시' } })
 
-test('groupPicksByAuthor: 작가 이름 가나다순, 같은 작가 안은 넘겨받은(선정) 순서', () => {
+test('groupPicksByAuthor: 후보 편수 많은 작가 순(같으면 가나다순), 같은 작가 안은 넘겨받은(선정) 순서', () => {
   const picks = [pk('a', '정지용'), pk('b', '김소월'), pk('c', '백석'), pk('d', '김소월'), pk('e', '정지용 ')]
   const groups = groupPicksByAuthor(picks)
-  expect(groups.map(g => g.author)).toEqual(['김소월', '백석', '정지용'])
-  expect(groups.map(g => g.picks.map(p => p.id))).toEqual([['b', 'd'], ['c'], ['a', 'e']]) // 앞뒤 공백은 같은 작가로
+  expect(groups.map(g => g.author)).toEqual(['김소월', '정지용', '백석'])
+  expect(groups.map(g => g.picks.map(p => p.id))).toEqual([['b', 'd'], ['a', 'e'], ['c']]) // 앞뒤 공백은 같은 작가로
 })
 
 test('groupPicksByAuthor: 작가가 비었거나 미상이면 묶지 않고 맨 끝(author null)에 선정순으로', () => {
@@ -85,5 +85,5 @@ test('groupPicksByAuthor: 작가가 비었거나 미상이면 묶지 않고 맨 
 
 test('orderPicksByAuthor: 묶음 순서대로 펼친 목록', () => {
   const picks = [pk('a', '정지용'), pk('b', ''), pk('c', '김소월'), pk('d', '정지용')]
-  expect(orderPicksByAuthor(picks).map(p => p.id)).toEqual(['c', 'a', 'd', 'b'])
+  expect(orderPicksByAuthor(picks).map(p => p.id)).toEqual(['a', 'd', 'c', 'b'])
 })

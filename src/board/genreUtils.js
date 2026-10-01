@@ -66,7 +66,7 @@ export function eraSummary(counts) {
   return [...ERAS, '기타'].filter(k => counts[k] > 0).map(k => `${k} ${counts[k]}`).join(' · ')
 }
 
-// 갈래별 후보 작가별 묶기 (2026-10-01 사용자 결정 A): 작가 이름 가나다순, 같은 작가 안은 넘겨받은 순서(선정순).
+// 갈래별 후보 작가별 묶기 (2026-10-01 사용자 결정): 후보 편수 많은 작가 순(같으면 가나다순), 같은 작가 안은 넘겨받은 순서(선정순).
 // 작가가 비었거나 '미상'이면 같은 작가로 묶지 않고 맨 끝 한 묶음(author: null)에 선정순으로 둔다.
 export function groupPicksByAuthor(picks) {
   const byKey = new Map()
@@ -78,7 +78,7 @@ export function groupPicksByAuthor(picks) {
     if (!byKey.has(key)) byKey.set(key, { author, picks: [] })
     byKey.get(key).picks.push(p)
   }
-  const groups = [...byKey.values()].sort((a, b) => a.author.localeCompare(b.author, 'ko'))
+  const groups = [...byKey.values()].sort((a, b) => b.picks.length - a.picks.length || a.author.localeCompare(b.author, 'ko'))
   if (unknown.length) groups.push({ author: null, picks: unknown })
   return groups
 }
