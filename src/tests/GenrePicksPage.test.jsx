@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 
@@ -17,7 +17,9 @@ vi.mock('../board/volumeApi.js', () => ({
   listVolumes: vi.fn().mockResolvedValue([]),
   updatePickConcept: vi.fn(),
 }))
+vi.mock('../board/exportPicks.js', () => ({ downloadBucketExcel: vi.fn(), downloadAllExcel: vi.fn() }))
 const api = await import('../board/volumeApi.js')
+const exportPicks = await import('../board/exportPicks.js')
 const { default: GenrePicksPage } = await import('../board/GenrePicksPage.jsx')
 const { ToastProvider } = await import('../components/Toast.jsx')
 
@@ -119,4 +121,47 @@ test("'태그 없음' 버튼으로 태그가 빈 후보만 걸러 본다", async
   expect(screen.getByRole('button', { name: '이별가 제거' })).toBeInTheDocument()
   await userEvent.click(filter)
   expect(screen.getByRole('button', { name: '봄 길 제거' })).toBeInTheDocument()
+})
+
+const AUTHOR_PICKS = [
+  { id: 'p1', work_id: 'W1', work_snapshot: { title: '향수', author: '정지용', genre: '시', curriculum: [] } },
+  { id: 'p2', work_id: 'W2', work_snapshot: { title: '진달래꽃', author: '김소월', genre: '시', curriculum: [] } },
+  { id: 'p3', work_id: 'W3', work_snapshot: { title: '정읍사', author: '', genre: '시', curriculum: [] } },
+  { id: 'p4', work_id: 'W4', work_snapshot: { title: '유리창', author: '정지용', genre: '시', curriculum: [] } },
+]
+const rowOrder = () => screen.getAllByRole('button', { name: / 제거$/ }).map(b => b.getAttribute('aria-label').replace(/ 제거$/, ''))
+
+test('기본은 작가별: 작가 가나다순으로 묶고, 2편 이상인 작가는 머리줄, 작가 미상은 맨 끝', async () => {
+  api.listPicks.mockResolvedValue(AUTHOR_PICKS)
+  renderPage()
+  await screen.findByRole('button', { name: '향수 제거' })
+  expect(screen.getByRole('button', { name: '작가별' })).toHaveAttribute('aria-pressed', 'true')
+  expect(rowOrder()).toEqual(['진달래꽃', '향수', '유리창', '정읍사'])
+  const header = screen.getByText('정지용', { selector: '[data-author-header] *' }).closest('[data-author-header]')
+  expect(within(header).getByText('2편')).toBeInTheDocument()
+  expect(document.querySelectorAll('[data-author-header]')).toHaveLength(1) // 1편뿐인 김소월·작가 미상은 머리줄 없음
+})
+
+test("'선정순'을 누르면 선정한 순서로 돌아가고 머리줄이 사라진다", async () => {
+  api.listPicks.mockResolvedValue(AUTHOR_PICKS)
+  renderPage()
+  await screen.findByRole('button', { name: '향수 제거' })
+  await userEvent.click(screen.getByRole('button', { name: '선정순' }))
+  expect(rowOrder()).toEqual(['향수', '진달래꽃', '정읍사', '유리창'])
+  expect(document.querySelectorAll('[data-author-header]')).toHaveLength(0)
+})
+
+test('엑셀도 화면에서 고른 정렬을 따른다', async () => {
+  api.listPicks.mockResolvedValue(AUTHOR_PICKS)
+  renderPage()
+  await screen.findByRole('button', { name: '향수 제거' })
+  await userEvent.click(screen.getByRole('button', { name: '현재 갈래 엑셀' }))
+  expect(exportPicks.downloadBucketExcel.mock.calls.at(-1)[0].map(p => p.id)).toEqual(['p2', 'p1', 'p4', 'p3'])
+  await userEvent.click(screen.getByRole('button', { name: '전체 엑셀 (갈래별 시트)' }))
+  expect(exportPicks.downloadAllExcel).toHaveBeenLastCalledWith(AUTHOR_PICKS, { byAuthor: true })
+  await userEvent.click(screen.getByRole('button', { name: '선정순' }))
+  await userEvent.click(screen.getByRole('button', { name: '현재 갈래 엑셀' }))
+  expect(exportPicks.downloadBucketExcel.mock.calls.at(-1)[0].map(p => p.id)).toEqual(['p1', 'p2', 'p3', 'p4'])
+  await userEvent.click(screen.getByRole('button', { name: '전체 엑셀 (갈래별 시트)' }))
+  expect(exportPicks.downloadAllExcel).toHaveBeenLastCalledWith(AUTHOR_PICKS, { byAuthor: false })
 })

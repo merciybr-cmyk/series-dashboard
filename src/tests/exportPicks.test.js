@@ -42,3 +42,16 @@ test('시트 이름 금지 문자를 치환한다', () => {
   expect(wb.SheetNames[0]).toBe('금지·문자·테스트')
   expect(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]])).toEqual([])
 })
+
+test('buildAllWorkbook: byAuthor면 갈래 시트마다 작가 가나다순으로 묶고 연번을 다시 매긴다', () => {
+  const picks = [
+    { id: 'a', work_snapshot: { title: '향수', author: '정지용', genre: '시' } },
+    { id: 'b', work_snapshot: { title: '진달래꽃', author: '김소월', genre: '시' } },
+    { id: 'c', work_snapshot: { title: '유리창', author: '정지용', genre: '시' } },
+  ]
+  const ws = buildAllWorkbook(picks, { byAuthor: true }).Sheets['현대시']
+  expect([ws['B2'].v, ws['B3'].v, ws['B4'].v]).toEqual(['진달래꽃', '향수', '유리창'])
+  expect(ws['A4'].v).toBe(3)
+  const plain = buildAllWorkbook(picks).Sheets['현대시'] // 옵션 없으면 넘겨받은(선정) 순서
+  expect(plain['B2'].v).toBe('향수')
+})
