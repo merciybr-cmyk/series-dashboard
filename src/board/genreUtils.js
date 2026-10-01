@@ -31,3 +31,36 @@ export function groupPicksByBucket(picks) {
   }
   return groups
 }
+
+// 고전/현대 구분 (2026-10-01 권별 비교): 버킷 이름이 '고전'으로 시작하면 고전, 그 밖에 분류된 갈래는 현대.
+// 매핑에 없는 갈래는 null → 화면에서 '기타'로 센다.
+export const ERAS = ['고전', '현대']
+
+export function eraOf(genre) {
+  const bucket = bucketOf(genre)
+  if (!bucket) return null
+  return bucket.startsWith('고전') ? '고전' : '현대'
+}
+
+// 부 안에서 고전 → 현대 → 미분류로 묶어 보여 준다. 묶음 안에서는 넘겨받은 순서(보드 순서)를 지킨다.
+export function orderByEra(works) {
+  const rank = w => {
+    const era = eraOf(w.work_snapshot?.genre)
+    return era ? ERAS.indexOf(era) : ERAS.length
+  }
+  return works.map((w, i) => [w, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([w]) => w)
+}
+
+// 편수·비율은 실제 책에 들어갈 작품 기준이라 '제외' 상태는 세지 않는다.
+export function countEras(works) {
+  const counts = { '고전': 0, '현대': 0, '기타': 0 }
+  for (const w of works) {
+    if (w.selection_status === 'excluded') continue
+    counts[eraOf(w.work_snapshot?.genre) || '기타']++
+  }
+  return counts
+}
+
+export function eraSummary(counts) {
+  return [...ERAS, '기타'].filter(k => counts[k] > 0).map(k => `${k} ${counts[k]}`).join(' · ')
+}
