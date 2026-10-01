@@ -131,12 +131,12 @@ const AUTHOR_PICKS = [
 ]
 const rowOrder = () => screen.getAllByRole('button', { name: / 제거$/ }).map(b => b.getAttribute('aria-label').replace(/ 제거$/, ''))
 
-test('기본은 작가별: 작가 가나다순으로 묶고, 2편 이상인 작가는 머리줄, 작가 미상은 맨 끝', async () => {
+test('기본은 작가별: 후보 편수 많은 작가 순으로 묶고, 2편 이상인 작가는 머리줄, 작가 미상은 맨 끝', async () => {
   api.listPicks.mockResolvedValue(AUTHOR_PICKS)
   renderPage()
   await screen.findByRole('button', { name: '향수 제거' })
   expect(screen.getByRole('button', { name: '작가별' })).toHaveAttribute('aria-pressed', 'true')
-  expect(rowOrder()).toEqual(['진달래꽃', '향수', '유리창', '정읍사'])
+  expect(rowOrder()).toEqual(['향수', '유리창', '진달래꽃', '정읍사'])
   const header = screen.getByText('정지용', { selector: '[data-author-header] *' }).closest('[data-author-header]')
   expect(within(header).getByText('2편')).toBeInTheDocument()
   expect(document.querySelectorAll('[data-author-header]')).toHaveLength(1) // 1편뿐인 김소월·작가 미상은 머리줄 없음
@@ -156,7 +156,7 @@ test('엑셀도 화면에서 고른 정렬을 따른다', async () => {
   renderPage()
   await screen.findByRole('button', { name: '향수 제거' })
   await userEvent.click(screen.getByRole('button', { name: '현재 갈래 엑셀' }))
-  expect(exportPicks.downloadBucketExcel.mock.calls.at(-1)[0].map(p => p.id)).toEqual(['p2', 'p1', 'p4', 'p3'])
+  expect(exportPicks.downloadBucketExcel.mock.calls.at(-1)[0].map(p => p.id)).toEqual(['p1', 'p4', 'p2', 'p3'])
   await userEvent.click(screen.getByRole('button', { name: '전체 엑셀 (갈래별 시트)' }))
   expect(exportPicks.downloadAllExcel).toHaveBeenLastCalledWith(AUTHOR_PICKS, { byAuthor: true })
   await userEvent.click(screen.getByRole('button', { name: '선정순' }))
