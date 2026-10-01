@@ -1,5 +1,6 @@
 // 권별 비교 엑셀 (2026-09-28): 화면의 권별 비교를 회의 자료로 — 한눈에 보기(권=열, 부별) + 전체 목록
 // 2026-10-01: 화면과 같이 부 안은 고전 → 현대 순, 부 머리줄에 고전·현대 편수, 전체 목록에 '고전/현대' 열
+// 2026-10-01: 한눈에 보기는 작품명·작가명만(상태 표시 없음) — 그래서 '제외' 작품은 한눈에 보기에서 뺀다. 상태는 전체 목록에서 본다.
 import * as XLSX from 'xlsx-js-style'
 import { SELECTION_LABELS } from './constants.js'
 import { eraOf, eraSummary } from './genreUtils.js'
@@ -29,6 +30,7 @@ function buildColumns(args) {
         genre: w.work_snapshot?.genre || '',
         era: eraOf(w.work_snapshot?.genre) || '기타',
         status: SELECTION_LABELS[w.selection_status] || w.selection_status,
+        excluded: w.selection_status === 'excluded',
         others: (volumesByWork.get(w.work_id) || []).filter(id => id !== volume.id).map(id => numberOf[id]).sort((a, b) => a - b),
       })),
     })),
@@ -65,7 +67,10 @@ function overviewSheet(columns) {
     const out = []
     for (const g of col.groups) {
       if (g.label) out.push([`[${g.label}] ${eraSummary(g.counts)}`.trim(), PART_STYLE])
-      for (const w of g.works) out.push([`${w.title} (${w.author}) · ${w.status}`, w.others.length ? DUP_STYLE : null])
+      for (const w of g.works) {
+        if (w.excluded) continue
+        out.push([w.author ? `${w.title} (${w.author})` : w.title, w.others.length ? DUP_STYLE : null])
+      }
     }
     return out
   })

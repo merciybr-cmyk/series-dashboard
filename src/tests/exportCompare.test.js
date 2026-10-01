@@ -35,10 +35,11 @@ test('buildCompareWorkbook: 한눈에 보기(권=열, 부 머리줄)와 전체 �
   expect(ov['B1'].v).toBe('2권 성장')
   expect(ov['A1'].s.fill.fgColor.rgb).toBe('4472C4')
   expect(ov['A2'].v).toBe('[1부 시] 현대 1')
-  expect(ov['A3'].v).toBe('소나기 (황순원) · 확정')
+  expect(ov['A3'].v).toBe('소나기 (황순원)')                // 상태 표시 없이 작품명·작가명만
   expect(ov['A3'].s.fill.fgColor.rgb).toBe('FFF2CC') // 다른 권과 겹침
   expect(ov['A4'].v).toBe('[미배정] 현대 1')
-  expect(ov['B2'].v).toBe('소나기 (황순원) · 후보')
+  expect(ov['B2'].v).toBe('소나기 (황순원)')
+  expect(ov['B3']?.v ?? '').toBe('')                         // '제외' 작품(풀)은 한눈에 보기에서 뺀다
   const list = wb.Sheets['전체 목록']
   expect(list['E2'].v).toBe('소나기')
   expect(list['A1'].s.font.bold).toBe(true)
@@ -54,5 +55,11 @@ test('부 안에서는 화면처럼 고전 → 현대 순서, 순서 번호도 �
   expect(rows.map(r => [r['순서'], r['작품명'], r['고전/현대']])).toEqual([[1, '홍길동전', '고전'], [2, '소나기', '현대']])
   const ov = buildCompareWorkbook(args).Sheets['한눈에 보기']
   expect(ov['A2'].v).toBe('[1부 시] 고전 1 · 현대 1')
-  expect(ov['A3'].v).toBe('홍길동전 (허균) · 후보')
+  expect(ov['A3'].v).toBe('홍길동전 (허균)')
+})
+
+test('한눈에 보기: 작가명이 비어 있으면 작품명만', () => {
+  const vw = [{ id: 'a', volume_id: 'v1', work_id: 'W1', part_id: 'p1', sort_order: 10, selection_status: 'candidate', work_snapshot: { title: '청산별곡', author: '', genre: '고전운문' } }]
+  const ov = buildCompareWorkbook({ volumes: VOLUMES.slice(0, 1), allVw: vw, allParts: PARTS, confirmedOnly: false }).Sheets['한눈에 보기']
+  expect(ov['A3'].v).toBe('청산별곡')
 })
