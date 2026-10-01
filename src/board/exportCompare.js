@@ -1,7 +1,9 @@
 // 권별 비교 엑셀 (2026-09-28): 화면의 권별 비교를 회의 자료로 — 한눈에 보기(권=열, 부별) + 전체 목록
+// 2026-10-01: 화면과 같이 부 안은 고전 → 현대 순, 부 머리줄에 고전·현대 편수, 전체 목록에 '고전/현대' 열
 import * as XLSX from 'xlsx-js-style'
-import { groupByPart, partLabel } from './boardUtils.js'
 import { SELECTION_LABELS } from './constants.js'
+import { eraOf, eraSummary } from './genreUtils.js'
+import { buildCompareColumns, volumesByWork as buildVolumesByWork } from './compareUtils.js'
 import { today } from './exportPicks.js'
 
 const HEADER_STYLE = {
@@ -12,33 +14,25 @@ const HEADER_STYLE = {
 const PART_STYLE = { font: { bold: true }, fill: { patternType: 'solid', fgColor: { rgb: 'DDEBF7' } } }
 const DUP_STYLE = { fill: { patternType: 'solid', fgColor: { rgb: 'FFF2CC' } } } // 화면의 노란 겹침 강조
 
-// 권별 → 부 그룹 → 작품. 겹침 판정은 화면과 같이 '제외' 상태를 뺀다.
-function buildColumns({ volumes, allVw, allParts, confirmedOnly }) {
-  const volumesByWork = new Map()
-  for (const w of allVw) {
-    if (w.selection_status === 'excluded') continue
-    if (!volumesByWork.has(w.work_id)) volumesByWork.set(w.work_id, [])
-    volumesByWork.get(w.work_id).push(w.volume_id)
-  }
-  const numberOf = Object.fromEntries(volumes.map(v => [v.id, v.number]))
-  return [...volumes].sort((a, b) => a.number - b.number).map(v => {
-    const works = allVw
-      .filter(w => w.volume_id === v.id)
-      .filter(w => !confirmedOnly || w.selection_status === 'confirmed')
-      .sort((a, b) => a.sort_order - b.sort_order)
-    const parts = allParts.filter(p => p.volume_id === v.id)
-    const groups = groupByPart(works, parts).map(g => ({
-      label: parts.length ? (g.part ? partLabel(g.part) : '미배정') : '',
+// 권별 → 부 그룹 → 작품 (묶음·순서·편수는 화면과 같은 compareUtils). 겹침 판정은 화면과 같이 '제외' 상태를 뺀다.
+function buildColumns(args) {
+  const volumesByWork = buildVolumesByWork(args.allVw)
+  const numberOf = Object.fromEntries(args.volumes.map(v => [v.id, v.number]))
+  return buildCompareColumns(args).map(({ volume, groups }) => ({
+    volume,
+    groups: groups.map(g => ({
+      label: g.label,
+      counts: g.counts,
       works: g.works.map(w => ({
         title: w.work_snapshot?.title || '',
         author: w.work_snapshot?.author || '',
         genre: w.work_snapshot?.genre || '',
+        era: eraOf(w.work_snapshot?.genre) || '기타',
         status: SELECTION_LABELS[w.selection_status] || w.selection_status,
-        others: (volumesByWork.get(w.work_id) || []).filter(id => id !== v.id).map(id => numberOf[id]).sort((a, b) => a - b),
+        others: (volumesByWork.get(w.work_id) || []).filter(id => id !== volume.id).map(id => numberOf[id]).sort((a, b) => a - b),
       })),
-    }))
-    return { volume: v, groups }
-  })
+    })),
+  }))
 }
 
 export function compareRows(args) {
@@ -55,6 +49,7 @@ export function compareRows(args) {
           '작품명': w.title,
           '작가': w.author,
           '갈래': w.genre,
+          '고전/현대': w.era,
           '상태': w.status,
           '다른 권 중복': w.others.length ? `${w.others.join('·')}권` : '',
         })
@@ -69,7 +64,7 @@ function overviewSheet(columns) {
   const lines = columns.map(col => {
     const out = []
     for (const g of col.groups) {
-      if (g.label) out.push([`[${g.label}]`, PART_STYLE])
+      if (g.label) out.push([`[${g.label}] ${eraSummary(g.counts)}`.trim(), PART_STYLE])
       for (const w of g.works) out.push([`${w.title} (${w.author}) · ${w.status}`, w.others.length ? DUP_STYLE : null])
     }
     return out
@@ -91,8 +86,8 @@ function overviewSheet(columns) {
 
 function listSheet(rows) {
   const ws = XLSX.utils.json_to_sheet(rows)
-  ws['!cols'] = [6, 28, 12, 6, 28, 12, 8, 8, 12].map(wch => ({ wch }))
-  for (let c = 0; c < 9; c++) {
+  ws['!cols'] = [6, 28, 12, 6, 28, 12, 8, 9, 8, 12].map(wch => ({ wch }))
+  for (let c = 0; c < 10; c++) {
     const cell = ws[XLSX.utils.encode_cell({ r: 0, c })]
     if (cell) cell.s = HEADER_STYLE
   }
