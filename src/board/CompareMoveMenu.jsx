@@ -6,7 +6,7 @@ import { partLabel } from './boardUtils.js'
 
 export default function CompareMoveMenu({
   label, triggerText, triggerClass, volumes, partsByVolume, initialVolumeId = '', initialPartFor,
-  blockedText, confirmText, onConfirm, onRemove = null, onRevert = null,
+  blockedText, confirmText, onConfirm, onRemove = null, onRevert = null, order = null,
 }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState({ top: 0, left: 0 })
@@ -59,6 +59,18 @@ export default function CompareMoveMenu({
       {open && createPortal(
         <div ref={boxRef} role="dialog" aria-label={label} style={{ position: 'fixed', top: pos.top, left: pos.left }}
           className="z-50 w-72 rounded border border-gray-200 bg-white p-3 text-sm shadow-lg">
+          {order && (
+            <div className="mb-2 flex flex-wrap items-center gap-2 border-b border-gray-100 pb-2">
+              <button type="button" disabled={!order.onUp} onClick={() => act(order.onUp)}
+                className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 disabled:opacity-40">위로</button>
+              <button type="button" disabled={!order.onDown} onClick={() => act(order.onDown)}
+                className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 disabled:opacity-40">아래로</button>
+              {order.onRevert && (
+                <button type="button" onClick={() => act(order.onRevert)}
+                  className="ml-auto text-xs text-gray-500 hover:underline">이 묶음 순서 되돌리기</button>
+              )}
+            </div>
+          )}
           <div className="mb-2 flex gap-2">
             <select aria-label="권" value={volumeId} onChange={e => pickVolume(e.target.value)}
               className="min-w-0 flex-1 rounded border border-gray-300 px-1 py-1">

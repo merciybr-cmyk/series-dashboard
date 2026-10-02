@@ -5,6 +5,7 @@ import { attachmentText } from './compareSave.js'
 function lineOf(i) {
   if (i.kind === 'move') return `〈${i.title}〉 ${i.from} → ${i.to}`
   if (i.kind === 'add') return `〈${i.title}〉 → ${i.to} (새로)`
+  if (i.kind === 'order') return `${i.to} — 순서 변경`
   return `〈${i.title}〉 ${i.from}에서 빼기`
 }
 
@@ -15,7 +16,7 @@ export default function CompareSaveDialog({ items, attachments, warnings, saving
       <div role="dialog" aria-modal="true" aria-label="저장 확인"
         className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded bg-white p-4 shadow-xl">
         <h3 className="mb-1 font-bold">저장할까요?</h3>
-        <p className="mb-3 text-sm text-gray-600">옮기기 {count('move')} · 넣기 {count('add')} · 빼기 {count('remove')}</p>
+        <p className="mb-3 text-sm text-gray-600">옮기기 {count('move')} · 넣기 {count('add')} · 빼기 {count('remove')} · 순서 {count('order')}</p>
         <ul className="mb-4 space-y-1 text-sm">
           {items.map(i => {
             const w = warnings.get(i.rowId) || []

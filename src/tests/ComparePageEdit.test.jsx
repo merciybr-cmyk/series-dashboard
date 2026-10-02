@@ -172,14 +172,14 @@ test('저장: 확인 창에 요약·목록·딸린 업무 경고를 보이고, �
 
   await userEvent.click(screen.getByRole('button', { name: '저장' }))
   const confirmBox = await screen.findByRole('dialog', { name: '저장 확인' })
-  expect(within(confirmBox).getByText('옮기기 1 · 넣기 0 · 빼기 1')).toBeInTheDocument()
+  expect(within(confirmBox).getByText('옮기기 1 · 넣기 0 · 빼기 1 · 순서 0')).toBeInTheDocument()
   expect(within(confirmBox).getByText('〈소나기〉 1권 2부 → 2권 2부')).toBeInTheDocument()
   expect(within(confirmBox).getByText('〈산유화〉 2권 1부에서 빼기')).toBeInTheDocument()
   expect(await within(confirmBox).findByText('업무 1건이 함께 지워집니다')).toBeInTheDocument()
   expect(api.listAttachmentRefs).toHaveBeenCalledWith(['d'])
 
   await clickSaveIn(confirmBox)
-  expect(await screen.findByText('반영했습니다: 옮기기 1 · 넣기 0 · 빼기 1')).toBeInTheDocument()
+  expect(await screen.findByText('반영했습니다: 옮기기 1 · 넣기 0 · 빼기 1 · 순서 0')).toBeInTheDocument()
   expect(api.deleteVolumeWork).toHaveBeenCalledWith('d')
   expect(api.updateVolumeWork).toHaveBeenCalledWith('a', { volume_id: 'v2', part_id: 'q2', sort_order: 20, placement_batch_id: null })
   expect(screen.getByRole('button', { name: '편집' })).toBeInTheDocument()
@@ -232,7 +232,7 @@ test('저장 뒤 새로 읽기가 끝난 다음에 편집을 끝내고 결과를
   expect(screen.queryByText(/반영했습니다/)).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: '저장 중…' })).toBeDisabled()
   await act(async () => { finishReload() })
-  expect(await screen.findByText('반영했습니다: 옮기기 0 · 넣기 0 · 빼기 1')).toBeInTheDocument()
+  expect(await screen.findByText('반영했습니다: 옮기기 0 · 넣기 0 · 빼기 1 · 순서 0')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: '편집' })).toBeInTheDocument()
   expect(within(region('1권 첫 장면')).queryByText('소나기')).not.toBeInTheDocument()
 })
@@ -258,7 +258,7 @@ test('작품 넣기 패널: 미배치 후보가 보이고, 넣기 메뉴로 넣�
   const confirmBox = await screen.findByRole('dialog', { name: '저장 확인' })
   expect(within(confirmBox).getByText('〈돌다리〉 → 2권 2부 (새로)')).toBeInTheDocument()
   await clickSaveIn(confirmBox)
-  await screen.findByText('반영했습니다: 옮기기 0 · 넣기 1 · 빼기 0')
+  await screen.findByText('반영했습니다: 옮기기 0 · 넣기 1 · 빼기 0 · 순서 0')
   expect(api.insertPlacedWork).toHaveBeenCalledWith({
     volumeId: 'v2', workId: 'W9', workSnapshot: { title: '돌다리', author: '이태준', genre: '소설', curriculum: ['4차'] },
     partId: 'q2', batchId: null, sortOrder: 30,
@@ -294,4 +294,45 @@ test('검색 패널 결과에도 끌기 손잡이가 있다', async () => {
   await userEvent.click(screen.getByRole('button', { name: '작품 넣기' }))
   const panel = await screen.findByRole('complementary', { name: '작품 넣기 패널' })
   expect(await within(panel).findByRole('button', { name: '「돌다리」 끌기' })).toBeInTheDocument()
+})
+
+test('메뉴의 위로·아래로로 같은 묶음 순서를 바꾸고, 되돌리기·저장이 된다', async () => {
+  // 1권 2부 현대: 소나기 a(10) · 운수 좋은 날 e(30)
+  const E = { id: 'e', volume_id: 'v1', work_id: 'W5', part_id: 'p2', sort_order: 30, selection_status: 'candidate', work_snapshot: snap('운수 좋은 날', '현진건', '소설', ['2차']) }
+  api.listAllVolumeWorks.mockResolvedValue([...VW, E])
+  renderPage()
+  await startEdit()
+  const titles = () => within(region('1권 첫 장면')).getAllByRole('listitem')
+    .map(li => li.querySelector('span[title]')?.getAttribute('title')?.split(' ')[0]).filter(Boolean)
+
+  let dlg = await openMenu('1권 첫 장면', '운수 좋은 날')
+  expect(within(dlg).getByRole('button', { name: '아래로' })).toBeDisabled()
+  await userEvent.click(within(dlg).getByRole('button', { name: '위로' }))
+  expect(titles().indexOf('운수')).toBeLessThan(titles().indexOf('소나기'))
+  expect(screen.getByText('편집 중 · 바뀐 작품 1건')).toBeInTheDocument()
+
+  dlg = await openMenu('1권 첫 장면', '운수 좋은 날')
+  await userEvent.click(within(dlg).getByRole('button', { name: '이 묶음 순서 되돌리기' }))
+  expect(screen.getByText('편집 중 · 바뀐 작품 0건')).toBeInTheDocument()
+
+  dlg = await openMenu('1권 첫 장면', '운수 좋은 날')
+  await userEvent.click(within(dlg).getByRole('button', { name: '위로' }))
+  await userEvent.click(screen.getByRole('button', { name: '저장' }))
+  const confirmBox = await screen.findByRole('dialog', { name: '저장 확인' })
+  expect(within(confirmBox).getByText('옮기기 0 · 넣기 0 · 빼기 0 · 순서 1')).toBeInTheDocument()
+  expect(within(confirmBox).getByText('1권 2부 현대 — 순서 변경')).toBeInTheDocument()
+  await clickSaveIn(confirmBox)
+  expect(await screen.findByText('반영했습니다: 옮기기 0 · 넣기 0 · 빼기 0 · 순서 1')).toBeInTheDocument()
+  expect(api.updateVolumeWork).toHaveBeenCalledWith('e', { sort_order: 10 })
+  expect(api.updateVolumeWork).toHaveBeenCalledWith('a', { sort_order: 30 })
+})
+
+test('검색 패널의 넣기 메뉴에는 위로·아래로가 없다', async () => {
+  renderPage()
+  await startEdit()
+  await userEvent.click(screen.getByRole('button', { name: '작품 넣기' }))
+  const panel = await screen.findByRole('complementary', { name: '작품 넣기 패널' })
+  await userEvent.click(await within(panel).findByRole('button', { name: '「돌다리」 넣기' }))
+  const dlg = screen.getByRole('dialog', { name: '「돌다리」 넣기' })
+  expect(within(dlg).queryByRole('button', { name: '위로' })).not.toBeInTheDocument()
 })

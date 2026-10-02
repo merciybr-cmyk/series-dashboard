@@ -8,14 +8,16 @@ import {
   listVolumes, listAllVolumeWorks, listAllParts, listAttachmentRefs,
   updateVolumeWork, deleteVolumeWork, ensureWorkId, insertPlacedWork,
 } from './volumeApi.js'
-import { eraSummary } from './genreUtils.js'
+import { eraSummary, eraOf } from './genreUtils.js'
 import {
   buildCompareColumns, compareSummary, compareWarnings, totalOf, volumesByWork as buildVolumesByWork,
 } from './compareUtils.js'
 import {
   EMPTY_DRAFT, changeCount, effectiveRows, moveRow, removeRow, revertRow, addWork,
   canPlace, placeErrorText, defaultPartFor, describeDraft, resolveDrop, toDropActive,
+  groupOrder, moveInGroup, revertGroupOrder, resolveAnchor,
 } from './compareEdit.js'
+import { groupKeyOfRow, eraKeyOf } from './compareOrder.js'
 import { DraggableWorkRow, DraggableSheetItem, DropZone, visiblePointerWithin } from './CompareDnd.jsx'
 import { useWorkLookup, buildDuplicatesByKey } from './useWorkLookup.js'
 import { workKeyOf } from '../works/workKey.js'
@@ -144,6 +146,7 @@ export default function ComparePage() {
   const [panelUsed, setPanelUsed] = useState(false)
   const [dragging, setDragging] = useState(null)
   const [overVolumeId, setOverVolumeId] = useState(null)
+  const [dropHint, setDropHint] = useState(null)
   const { show } = useToast()
   const lookup = useWorkLookup(panelUsed)
   // 클릭(⋯·넣기 버튼)과 끌기를 구분하려고 5px 이상 움직여야 끌기 시작
@@ -291,17 +294,35 @@ export default function ComparePage() {
   function handleDragStart({ active }) {
     setDragging(active.data.current)
   }
-  function handleDragOver({ over }) {
-    setOverVolumeId(over?.data.current?.volumeId ?? null)
+  // 끌고 있는 작품의 시대 — 같은 시대 묶음 안에만 끼워 넣는다 (A안)
+  function dragEra(d) {
+    if (d.type === 'row') return eraKeyOf(rows.find(r => r.id === d.rowId) || {})
+    return eraOf(d.work?.['장르']) || '기타'
   }
-  function handleDragEnd({ active, over }) {
+  // 끌기 중: 놓을 수 없는 권 표시 + '들어갈 자리' 선 (실제 놓기와 같은 resolveAnchor 규칙)
+  function handleDragHover({ over, collisions }) {
+    const target = over?.data.current
+    setOverVolumeId(target?.volumeId ?? null)
+    if (!target || !dragging || (dragRef && blockedFor(dragRef, target.volumeId))) {
+      setDropHint(null)
+      return
+    }
+    const next = resolveAnchor({
+      rows, era: dragEra(dragging), selfId: dragging.type === 'row' ? dragging.rowId : null,
+      over: { ...target, position: collisions?.[0]?.data?.position },
+    })
+    setDropHint(h => (h?.anchorId === next?.anchorId && h?.position === next?.position ? h : next))
+  }
+  function handleDragEnd({ active, over, collisions }) {
     setDragging(null)
     setOverVolumeId(null)
+    setDropHint(null)
     const data = active?.data.current
     const target = over?.data.current
     if (!data || !target) return
     const { draft: next, error } = resolveDrop({
-      draft, baseline, active: toDropActive(data, lookup.registryMap), over: target,
+      draft, baseline, active: toDropActive(data, lookup.registryMap),
+      over: { ...target, position: collisions?.[0]?.data?.position },
       volumeNumberOf: id => numberById[id], newTempId,
     })
     if (error) show(error)
@@ -310,6 +331,7 @@ export default function ComparePage() {
   function handleDragCancel() {
     setDragging(null)
     setOverVolumeId(null)
+    setDropHint(null)
   }
 
   // 끄는 작품이 놓일 수 없는 권이면 그 권 테두리를 빨갛게
@@ -344,11 +366,14 @@ export default function ComparePage() {
   function rowTrailing(row) {
     if (row._removed) {
       return (
-        <button type="button" onClick={() => setDraft(d => revertRow(d, row.id))}
+        <button type="button" onClick={() => setDraft(d => revertRow(d, row.id, baseline))}
           className="shrink-0 rounded border border-gray-300 px-1.5 py-0.5 text-xs text-gray-600">되돌리기</button>
       )
     }
     const title = row.work_snapshot?.title
+    const key = groupKeyOfRow(row)
+    const ids = groupOrder(rows, key)
+    const i = ids.indexOf(row.id)
     return (
       <CompareMoveMenu
         label={`「${title}」 메뉴`}
@@ -361,8 +386,13 @@ export default function ComparePage() {
         blockedText={vid => blockedFor({ workId: row.work_id, key: row._key, selfId: row.id }, vid)}
         confirmText="옮기기"
         onConfirm={(vid, pid) => setDraft(d => moveRow(d, baseline, row.id, vid, pid))}
-        onRemove={() => setDraft(d => removeRow(d, row.id))}
-        onRevert={row._moved || row._added ? () => setDraft(d => revertRow(d, row.id)) : null}
+        onRemove={() => setDraft(d => removeRow(d, row.id, baseline))}
+        onRevert={row._moved || row._added ? () => setDraft(d => revertRow(d, row.id, baseline)) : null}
+        order={{
+          onUp: i > 0 ? () => setDraft(d => moveInGroup(d, baseline, row.id, -1)) : null,
+          onDown: i >= 0 && i < ids.length - 1 ? () => setDraft(d => moveInGroup(d, baseline, row.id, 1)) : null,
+          onRevert: draft.orders?.[key] ? () => setDraft(d => revertGroupOrder(d, key)) : null,
+        }}
       />
     )
   }
@@ -414,8 +444,8 @@ export default function ComparePage() {
   )
 
   return (
-    <DndContext sensors={sensors} collisionDetection={visiblePointerWithin} onDragStart={handleDragStart} onDragOver={handleDragOver}
-      onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
+    <DndContext sensors={sensors} collisionDetection={visiblePointerWithin} onDragStart={handleDragStart}
+      onDragOver={handleDragHover} onDragMove={handleDragHover} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
       {header}
       {saveResult && <SaveResult result={saveResult} onClose={() => setSaveResult(null)} />}
       <div className="flex items-start gap-4">
@@ -447,6 +477,7 @@ export default function ComparePage() {
                               const rowProps = {
                                 row: w, others, warnings: warnings.get(w.id) || [],
                                 fromLabel: fromLabel(w), trailing: editing ? rowTrailing(w) : null,
+                                insertHint: dropHint?.anchorId === w.id ? dropHint.position : null,
                               }
                               return editing && !w._removed
                                 ? <DraggableWorkRow key={w.id} {...rowProps} />
