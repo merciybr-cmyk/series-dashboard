@@ -98,3 +98,28 @@ test("'미배치만'을 켜면 제외 외 상태로 권에 들어간 작품을 �
   expect(screen.queryByText('소나기')).not.toBeInTheDocument()
   expect(screen.getByText('진달래꽃')).toBeInTheDocument()
 })
+
+test("defaultOnlyUnplaced면 '미배치만'이 켜진 채로 시작한다", () => {
+  const dup = new Map([[workKeyOf(WORKS[0]), [{ volumeNumber: 2, selection_status: 'candidate' }]]])
+  render(<SearchPane works={WORKS} duplicatesByKey={dup} onAdd={() => {}} defaultOnlyUnplaced />)
+  expect(screen.getByLabelText('미배치만')).toBeChecked()
+  expect(screen.queryByText('소나기')).not.toBeInTheDocument()
+  expect(screen.getByText('별 헤는 밤')).toBeInTheDocument()
+})
+
+test('renderAction과 itemComponent로 버튼과 줄을 바꿀 수 있다', async () => {
+  const seen = []
+  const Item = ({ itemKey, work, getCurricula, className, children }) => {
+    seen.push([itemKey, work['작품명'], getCurricula()])
+    return <li className={className} data-testid="custom-item">{children}</li>
+  }
+  render(
+    <SearchPane works={WORKS} duplicatesByKey={new Map()}
+      renderAction={(work, getCurricula) => <span>넣기:{work['작품명']}:{getCurricula().join(',')}</span>}
+      itemComponent={Item} />,
+  )
+  expect(screen.getAllByTestId('custom-item')).toHaveLength(2)
+  expect(screen.queryByRole('button', { name: '추가' })).not.toBeInTheDocument()
+  expect(screen.getByText('넣기:소나기:7차,2015')).toBeInTheDocument()
+  expect(seen).toContainEqual([workKeyOf(WORKS[0]), '소나기', ['7차', '2015']])
+})

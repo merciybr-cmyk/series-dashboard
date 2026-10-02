@@ -98,7 +98,10 @@ export default function HomePage() {
     const upcoming = [...upcomingTasks, ...upcomingSchedules]
       .sort((a, b) => a.due_date.localeCompare(b.due_date))
     const progress = volumeProgress(data.volumes, data.vworks, data.tasks)
-    const feed = groupActivity(data.activity, nameOf, 20).map(g => ({
+    const numberById = Object.fromEntries(data.volumes.map(v => [v.id, v.number]))
+    const titleById = Object.fromEntries(data.vworks.map(w => [w.id, w.work_snapshot?.title]))
+    const ctx = { volumeNumberOf: id => numberById[id], titleOfVw: id => titleById[id] }
+    const feed = groupActivity(data.activity, nameOf, 20, ctx).map(g => ({
       id: g.id,
       when: new Date(g.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
       text: g.text,

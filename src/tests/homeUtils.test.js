@@ -114,6 +114,20 @@ describe('describeActivity', () => {
     expect(describeActivity({ table_name: 'volumes', action: 'update', diff: {}, actor_id: 'gone' }, nameOf))
       .toBe('알 수 없는 사용자님이 권 정보를 변경했습니다')
   })
+
+  test('권을 옮긴 기록은 작품명과 옮겨 간 권으로', () => {
+    const nameOf = () => '윤보라'
+    const ctx = { volumeNumberOf: id => ({ v7: 7 })[id], titleOfVw: id => ({ r1: '돌다리' })[id] }
+    const move = (record_id, to) => ({
+      table_name: 'volume_works', action: 'update', record_id, actor_id: 'm1',
+      diff: { volume_id: ['v5', to], part_id: ['p', 'q'] },
+    })
+    expect(describeActivity(move('r1', 'v7'), nameOf, ctx)).toBe('윤보라님이 「돌다리」을(를) 7권으로 옮겼습니다')
+    expect(describeActivity(move('gone', 'v9'), nameOf, ctx)).toBe('윤보라님이 작품을 다른 권으로 옮겼습니다')
+    expect(describeActivity(move('r1', 'v7'), nameOf)).toBe('윤보라님이 작품을 다른 권으로 옮겼습니다')
+    // 작품명을 모르더라도 권 번호를 알면 번호를 보여 준다 (설계 §3.3)
+    expect(describeActivity(move('gone', 'v7'), nameOf, ctx)).toBe('윤보라님이 작품을 7권으로 옮겼습니다')
+  })
 })
 
 describe('groupActivity', () => {
@@ -144,10 +158,31 @@ describe('groupActivity', () => {
     ])
   })
 
-  test('손으로 추가한 작품(묶음 없음)은 제목이 달라 따로 보이고, limit만큼만 돌려준다', () => {
-    const entries = [vw(3, 'insert', null, '풀', '시', 3), vw(2, 'insert', null, '서시', '시', 2), vw(1, 'insert', null, '향수', '시', 1)]
+  test('손으로 추가한 작품이 10분 안에 이어지면 「첫 작품」 외 N편으로 묶고, limit만큼만 돌려준다', () => {
+    const entries = [
+      vw(4, 'insert', null, '풀', '시', 40),
+      vw(3, 'insert', null, '서시', '시', 3), vw(2, 'insert', null, '향수', '시', 2), vw(1, 'insert', null, '진달래꽃', '시', 1),
+    ]
     const out = groupActivity(entries, nameOf, 2)
-    expect(out.map(g => g.text)).toEqual(['윤보라님이 「풀」을(를) 추가했습니다', '윤보라님이 「서시」을(를) 추가했습니다'])
-    expect(out[0]).toMatchObject({ id: 3, created_at: at(3) })
+    expect(out.map(g => g.text)).toEqual(['윤보라님이 「풀」을(를) 추가했습니다', '윤보라님이 「서시」 외 2편을 추가했습니다'])
+    expect(out[0]).toMatchObject({ id: 4, created_at: at(40) })
+  })
+
+  test('손으로 한 추가·제거·권 옮기기는 종류별로 묶는다', () => {
+    const ctx = { volumeNumberOf: () => 7, titleOfVw: id => ({ r1: '돌다리', r2: '복덕방' })[id] }
+    const mv = (id, record_id, min) => ({
+      id, record_id, table_name: 'volume_works', action: 'update', actor_id: 'm1', created_at: at(min),
+      diff: { volume_id: ['v5', 'v7'] },
+    })
+    const entries = [
+      mv(6, 'r1', 9), mv(5, 'r2', 9),
+      vw(4, 'delete', null, '풀', '시', 8), vw(3, 'delete', null, '서시', '시', 8),
+      vw(2, 'insert', null, '향수', '시', 7),
+    ]
+    expect(groupActivity(entries, nameOf, 20, ctx).map(g => g.text)).toEqual([
+      '윤보라님이 「돌다리」 외 1편을 옮겼습니다',
+      '윤보라님이 「풀」 외 1편을 제거했습니다',
+      '윤보라님이 「향수」을(를) 추가했습니다',
+    ])
   })
 })
