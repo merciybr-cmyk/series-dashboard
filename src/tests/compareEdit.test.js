@@ -197,6 +197,34 @@ describe('순서 바꾸기', () => {
       .toBeNull()
   })
 
+  test('resolveAnchor: 자기 줄이 있는 부의 띠·빈 곳(줄 위가 아님)에 놓으면 null — 같은 부는 변화 없음', () => {
+    const rows = effectiveRows(B, EMPTY_DRAFT)
+    expect(resolveAnchor({ rows, era: '현대', selfId: 'a', over: { volumeId: 'v1', partId: 'p2' } })).toBeNull()
+    // 다른 부의 띠면 그 묶음 마지막 줄 뒤, 끄는 줄이 없으면(검색 결과) 같은 부여도 마지막 줄 뒤
+    expect(resolveAnchor({ rows, era: '현대', selfId: 'a', over: { volumeId: 'v1', partId: 'p1' } }))
+      .toEqual({ anchorId: 'z', position: 'after' })
+    expect(resolveAnchor({ rows, era: '현대', selfId: null, over: { volumeId: 'v1', partId: 'p2' } }))
+      .toEqual({ anchorId: 'c', position: 'after' })
+  })
+
+  test('resolveDrop: 자기 부의 띠·빈 곳에 놓으면 변화 없음', () => {
+    const r = drop({ type: 'row', rowId: 'a' }, { volumeId: 'v1', partId: 'p2' })
+    expect(r.draft).toBe(EMPTY_DRAFT)
+    expect(r.error).toBeNull()
+  })
+
+  test('resolveDrop: 같은 부의 다른 시대 줄 위에 놓으면 그래도 자기 묶음 맨 끝으로', () => {
+    const { draft } = drop({ type: 'row', rowId: 'a' }, { volumeId: 'v1', partId: 'p2', anchorId: 'g', position: 'before' })
+    expect(draft.moves).toEqual({})
+    expect(order(draft)).toEqual(['b', 'c', 'a'])
+  })
+
+  test('resolveDrop: 다른 부의 띠에 놓으면 옮기고 그 묶음 맨 끝으로', () => {
+    const { draft } = drop({ type: 'row', rowId: 'z' }, { volumeId: 'v1', partId: 'p2' })
+    expect(draft.moves).toEqual({ z: { volumeId: 'v1', partId: 'p2' } })
+    expect(order(draft)).toEqual(['a', 'b', 'c', 'z'])
+  })
+
   test('resolveDrop: 같은 묶음 안에 놓으면 옮기기 없이 순서만', () => {
     const { draft } = drop({ type: 'row', rowId: 'c' }, { volumeId: 'v1', partId: 'p2', anchorId: 'a', position: 'before' })
     expect(draft.moves).toEqual({})

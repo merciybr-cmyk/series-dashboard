@@ -156,10 +156,15 @@ export function revertGroupOrder(draft, groupKey) {
 }
 
 // 놓을 자리 해석 — 화면의 파란 선과 실제 놓기가 같은 규칙을 쓴다.
-// 같은 (권, 부, 시대) 묶음의 줄이면 그 줄 앞·뒤, 아니면 그 묶음 마지막 줄 뒤, 묶음이 비면 anchor 없음. 자기 자신 위면 null.
+// 같은 (권, 부, 시대) 묶음의 줄이면 그 줄 앞·뒤, 아니면 그 묶음 마지막 줄 뒤, 묶음이 비면 anchor 없음.
+// 자기 자신 위면 null, 자기 줄이 이미 있는 부의 띠·빈 곳(줄 위가 아님)에 놓아도 null — 같은 부에 놓으면 변화 없음.
 export function resolveAnchor({ rows, era, selfId = null, over }) {
   if (!over) return null
   if (over.anchorId && over.anchorId === selfId) return null
+  if (!over.anchorId && selfId) {
+    const self = rows.find(r => r.id === selfId)
+    if (self && self.volume_id === over.volumeId && samePart(self.part_id, over.partId)) return null
+  }
   const key = groupKeyOf(over.volumeId, over.partId, era)
   const anchor = over.anchorId ? rows.find(r => r.id === over.anchorId) : null
   if (anchor && !anchor._removed && groupKeyOfRow(anchor) === key) {
@@ -207,8 +212,10 @@ export function resolveDrop({ draft, baseline, active, over, volumeNumberOf, new
       if (!check.ok) return { draft, error: placeErrorText(check.reason, volumeNumberOf(over.volumeId)) }
       next = moveRow(draft, baseline, row.id, over.volumeId, over.partId)
     }
-    const at = resolveAnchor({ rows: effectiveRows(baseline, next), era: eraKeyOf(row), selfId: row.id, over })
-    return { draft: placeInGroup(next, baseline, row.id, at || {}), error: null }
+    // 옮기기 전 행으로 판정한다 — null이면 같은 부에 놓은 것이라 변화 없음 (옮긴 뒤 행으로 보면 다른 부에서 온 줄도 null이 된다)
+    const at = resolveAnchor({ rows, era: eraKeyOf(row), selfId: row.id, over })
+    if (!at) return { draft: next, error: null }
+    return { draft: placeInGroup(next, baseline, row.id, at), error: null }
   }
   if (active.type === 'sheet') {
     const check = canPlace(rows, { workId: active.workId, key: active.key }, over.volumeId)
