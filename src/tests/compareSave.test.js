@@ -1,6 +1,6 @@
 import { vi } from 'vitest'
 import { planSave, runSave, countAttachments, attachmentText, resultSummary } from '../board/compareSave.js'
-import { EMPTY_DRAFT, moveRow, removeRow, addWork } from '../board/compareEdit.js'
+import { EMPTY_DRAFT, moveRow, removeRow, addWork, moveInGroup, placeInGroup } from '../board/compareEdit.js'
 
 const row = (id, volume_id, work_id, part_id, sort_order = 10) => ({
   id, volume_id, work_id, part_id, sort_order, selection_status: 'candidate', work_snapshot: { title: `작품${id}` },
@@ -114,7 +114,7 @@ describe('runSave', () => {
     expect(api.insertPlacedWork).toHaveBeenCalledWith({
       volumeId: 'v2', workId: 'W100', workSnapshot: { title: '돌다리' }, partId: 'q2', batchId: null, sortOrder: 50,
     })
-    expect(result).toEqual({ removed: 2, moved: 1, added: 1, skipped: [], failed: [] })
+    expect(result).toEqual({ removed: 2, moved: 1, added: 1, reordered: 0, skipped: [], failed: [] })
   })
 
   test('같은 작품 충돌로 실패한 옮기기는 한 번 더 시도하고, 다른 실패는 목록에 남기고 계속한다', async () => {
@@ -159,5 +159,71 @@ test('countAttachments·attachmentText: 빼는 작품에 딸린 것 안내', () 
 })
 
 test('resultSummary', () => {
-  expect(resultSummary({ moved: 7, added: 3, removed: 2 })).toBe('반영했습니다: 옮기기 7 · 넣기 3 · 빼기 2')
+  expect(resultSummary({ moved: 7, added: 3, removed: 2 })).toBe('반영했습니다: 옮기기 7 · 넣기 3 · 빼기 2 · 순서 0')
+  expect(resultSummary({ moved: 0, added: 0, removed: 0, reordered: 2 })).toBe('반영했습니다: 옮기기 0 · 넣기 0 · 빼기 0 · 순서 2')
+})
+
+describe('순서 바꾸기 저장', () => {
+  const R = (id, part_id, sort_order, genre) => ({
+    id, volume_id: 'v1', work_id: `W${id}`, part_id, sort_order, selection_status: 'candidate',
+    work_snapshot: { title: `작품${id}`, genre },
+  })
+  // 1권 2부: 현대 a(10) · 고전 g(20) · 현대 b(30) / 1권 1부: 현대 z(40)
+  const B = [R('a', 'p2', 10, '소설'), R('g', 'p2', 20, '고전소설'), R('b', 'p2', 30, '소설'), R('z', 'p1', 40, '시')]
+  const P = [{ id: 'p1', volume_id: 'v1' }, { id: 'p2', volume_id: 'v1' }]
+
+  test('같은 묶음 순서만 바꾸면 번호가 달라지는 행만 고친다', () => {
+    const draft = moveInGroup(EMPTY_DRAFT, B, 'b', -1)
+    const plan = planSave({ draft, baseline: B, latestRows: B, latestParts: P })
+    expect(plan.moves).toEqual([])
+    expect(plan.reorders).toEqual([{
+      groupKey: 'v1|p2|현대',
+      ops: [{ id: 'b', title: '작품b', sortOrder: 10 }, { id: 'a', title: '작품a', sortOrder: 30 }],
+    }])
+  })
+
+  test('다른 부에서 옮겨 와 끼워 넣으면 옮기는 행이 그 자리 번호를, 뒤 행이 권 맨 뒤 번호를 받는다', () => {
+    const draft = placeInGroup(moveRow(EMPTY_DRAFT, B, 'z', 'v1', 'p2'), B, 'z', { anchorId: 'a', position: 'after' })
+    const plan = planSave({ draft, baseline: B, latestRows: B, latestParts: P })
+    expect(plan.moves).toEqual([{ id: 'z', title: '작품z', volumeId: 'v1', partId: 'p2', sortOrder: 30 }])
+    expect(plan.reorders).toEqual([{ groupKey: 'v1|p2|현대', ops: [{ id: 'b', title: '작품b', sortOrder: 50 }] }])
+  })
+
+  test('그사이 다른 분이 그 묶음에 넣은 작품은 뒤에 붙는다', () => {
+    const draft = moveInGroup(EMPTY_DRAFT, B, 'b', -1)
+    const latest = [...B, R('n', 'p2', 60, '소설')]
+    const plan = planSave({ draft, baseline: B, latestRows: latest, latestParts: P })
+    expect(plan.reorders[0].ops).toEqual([{ id: 'b', title: '작품b', sortOrder: 10 }, { id: 'a', title: '작품a', sortOrder: 30 }])
+  })
+
+  test('runSave: 옮기기 뒤에 순서를 고치고, op가 모두 성공한 묶음(op 없는 묶음 포함)을 센다', async () => {
+    const calls = []
+    const api = {
+      deleteVolumeWork: vi.fn(), ensureWorkId: vi.fn(), insertPlacedWork: vi.fn(),
+      updateVolumeWork: vi.fn(async (id, patch) => { calls.push([id, patch]); return {} }),
+    }
+    const plan = {
+      removes: [], adds: [], skipped: [], alreadyRemoved: 0,
+      moves: [{ id: 'z', title: 'Z', volumeId: 'v1', partId: 'p2', sortOrder: 30 }],
+      reorders: [{ groupKey: 'v1|p2|현대', ops: [{ id: 'b', title: 'B', sortOrder: 50 }] }, { groupKey: 'v1|p1|현대', ops: [] }],
+    }
+    const result = await runSave(plan, api, { registryMap: new Map() })
+    expect(calls.map(c => c[0])).toEqual(['z', 'b'])
+    expect(calls[1][1]).toEqual({ sort_order: 50 })
+    expect(result.reordered).toBe(2)
+  })
+
+  test('runSave: 순서 op가 하나라도 실패하면 그 묶음은 세지 않고 실패 목록에 남긴다', async () => {
+    const api = {
+      deleteVolumeWork: vi.fn(), ensureWorkId: vi.fn(), insertPlacedWork: vi.fn(),
+      updateVolumeWork: vi.fn(async id => { if (id === 'b') throw new Error('network down'); return {} }),
+    }
+    const plan = {
+      removes: [], moves: [], adds: [], skipped: [], alreadyRemoved: 0,
+      reorders: [{ groupKey: 'v1|p2|현대', ops: [{ id: 'a', title: 'A', sortOrder: 30 }, { id: 'b', title: 'B', sortOrder: 10 }] }],
+    }
+    const result = await runSave(plan, api, { registryMap: new Map() })
+    expect(result.reordered).toBe(0)
+    expect(result.failed).toEqual([{ title: 'B', reason: 'network down' }])
+  })
 })
