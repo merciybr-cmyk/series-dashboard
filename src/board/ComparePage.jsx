@@ -12,9 +12,12 @@ import {
   buildCompareColumns, compareSummary, compareWarnings, totalOf, volumesByWork as buildVolumesByWork,
 } from './compareUtils.js'
 import {
-  EMPTY_DRAFT, changeCount, effectiveRows, moveRow, removeRow, revertRow,
+  EMPTY_DRAFT, changeCount, effectiveRows, moveRow, removeRow, revertRow, addWork,
   canPlace, placeErrorText, defaultPartFor, describeDraft,
 } from './compareEdit.js'
+import { useWorkLookup, buildDuplicatesByKey } from './useWorkLookup.js'
+import { workKeyOf } from '../works/workKey.js'
+import CompareSearchPanel from './CompareSearchPanel.jsx'
 import { planSave, runSave, countAttachments, resultSummary } from './compareSave.js'
 import CompareSaveDialog from './CompareSaveDialog.jsx'
 import CompareWorkRow, { EraChip } from './CompareWorkRow.jsx'
@@ -23,6 +26,9 @@ import { useToast } from '../components/Toast.jsx'
 import { downloadCompareExcel } from './exportCompare.js'
 
 const leaveText = n => `저장하지 않은 변경 ${n}건이 있습니다. 나가면 사라집니다.`
+
+let tempSeq = 0
+const newTempId = () => `new-${++tempSeq}`
 
 const SAVE_API = { updateVolumeWork, deleteVolumeWork, ensureWorkId, insertPlacedWork }
 
@@ -130,7 +136,10 @@ export default function ComparePage() {
   const [attachments, setAttachments] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saveResult, setSaveResult] = useState(null)
+  const [panelOpen, setPanelOpen] = useState(false)
+  const [panelUsed, setPanelUsed] = useState(false)
   const { show } = useToast()
+  const lookup = useWorkLookup(panelUsed)
 
   const load = useCallback(async () => {
     const [vs, vw, ps] = await Promise.all([listVolumes(), listAllVolumeWorks(), listAllParts()])
@@ -162,6 +171,10 @@ export default function ComparePage() {
   const columns = useMemo(
     () => buildCompareColumns({ volumes, allVw: rows, allParts, confirmedOnly: editing ? false : confirmedOnly }),
     [volumes, rows, allParts, confirmedOnly, editing],
+  )
+  const duplicatesByKey = useMemo(
+    () => buildDuplicatesByKey(lookup.registry, rows, id => numberById[id]),
+    [lookup.registry, rows, numberById],
   )
 
   // 나가기 방지 (설계 §4.3): 앱 안 이동은 확인 창, 새로고침·탭 닫기는 브라우저 기본 확인
@@ -211,6 +224,7 @@ export default function ComparePage() {
 
   function finishEdit() {
     setEditing(false)
+    setPanelOpen(false)
     setDraft(EMPTY_DRAFT)
   }
 
@@ -243,12 +257,39 @@ export default function ComparePage() {
       return
     }
     const plan = planSave({ draft, baseline, latestRows, latestParts })
-    const result = await runSave(plan, SAVE_API, { registryMap: new Map() })
+    const result = await runSave(plan, SAVE_API, { registryMap: lookup.registryMap })
     setSaving(false)
     setSaveOpen(false)
     setSaveResult(result)
     finishEdit()
+    lookup.refresh()
     load().catch(err => show(err.message))
+  }
+
+  function togglePanel() {
+    setPanelOpen(o => !o)
+    setPanelUsed(true)
+  }
+
+  const renderAddAction = (work, getCurricula) => {
+    const key = workKeyOf(work)
+    const workId = lookup.registryMap.get(key) ?? null
+    return (
+      <CompareMoveMenu
+        label={`「${work['작품명']}」 넣기`}
+        triggerText="넣기"
+        triggerClass="shrink-0 rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white"
+        volumes={volumes}
+        partsByVolume={partsByVolume}
+        initialVolumeId=""
+        initialPartFor={vid => partFor(work['장르'], vid)}
+        blockedText={vid => blockedFor({ workId, key }, vid)}
+        confirmText="넣기"
+        onConfirm={(vid, pid) => setDraft(d => addWork(d, {
+          tempId: newTempId(), workId, key, work, curricula: getCurricula(), volumeId: vid, partId: pid,
+        }))}
+      />
+    )
   }
 
   function rowTrailing(row) {
@@ -284,6 +325,10 @@ export default function ComparePage() {
       <h2 className="text-lg font-bold">권별 비교</h2>
       <span className="text-sm text-blue-800">편집 중 · 바뀐 작품 {dirtyCount}건</span>
       <div className="ml-auto flex gap-2">
+        <button type="button" onClick={togglePanel} aria-pressed={panelOpen}
+          className={`rounded border px-3 py-1 text-sm ${panelOpen ? 'border-blue-600 bg-blue-600 text-white' : 'border-blue-300 bg-white text-blue-700'}`}>
+          작품 넣기
+        </button>
         <button type="button" onClick={cancelEdit}
           className="rounded border border-gray-300 bg-white px-3 py-1 text-sm text-gray-600">취소</button>
         <button type="button" onClick={openSave} disabled={!dirtyCount}
@@ -364,6 +409,14 @@ export default function ComparePage() {
             {!volumes.length && <p className="text-sm text-gray-400">아직 권이 없습니다.</p>}
           </div>
         </div>
+        {editing && panelOpen && (
+          <CompareSearchPanel
+            lookup={lookup}
+            duplicatesByKey={duplicatesByKey}
+            renderAction={renderAddAction}
+            onClose={() => setPanelOpen(false)}
+          />
+        )}
       </div>
       {saveOpen && (
         <CompareSaveDialog

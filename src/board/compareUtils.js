@@ -9,11 +9,11 @@ import { normText } from '../works/workKey.js'
 // 편집 중 뺀 행(_removed)은 화면에는 취소선으로 남지만 편수·겹침에서는 뺀다 (2026-10-02)
 const live = w => !w._removed
 
-// work_id → 수록 권 id 목록 (제외 상태·뺀 행은 겹침 판정에서 뺀다)
+// work_id → 수록 권 id 목록 (제외 상태·뺀 행·work_id 없는 새로 넣은 작품은 겹침 판정에서 뺀다)
 export function volumesByWork(allVw) {
   const map = new Map()
   for (const w of allVw) {
-    if (w.selection_status === 'excluded' || w._removed) continue
+    if (w.selection_status === 'excluded' || w._removed || !w.work_id) continue
     if (!map.has(w.work_id)) map.set(w.work_id, [])
     map.get(w.work_id).push(w.volume_id)
   }

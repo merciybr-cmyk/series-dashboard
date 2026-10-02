@@ -103,3 +103,16 @@ test('편집 중 뺀 행은 목록에 남기되 편수와 겹침에서는 뺀다
   expect(c1.groups[0].counts['현대']).toBe(0)
   expect(volumesByWork(rows).get('W1')).toEqual(['v2'])
 })
+
+test('volumesByWork: work_id가 없는 행(registry에 없는 새로 넣은 작품)은 겹침 판정에서 뺀다', () => {
+  const rows = [
+    { id: 'a', volume_id: 'v1', work_id: null, _key: 'k1', selection_status: 'candidate', work_snapshot: { genre: '시' } },
+    { id: 'b', volume_id: 'v2', work_id: null, _key: 'k2', selection_status: 'candidate', work_snapshot: { genre: '시' } },
+    { id: 'c', volume_id: 'v2', work_id: undefined, selection_status: 'candidate', work_snapshot: { genre: '시' } },
+    { id: 'd', volume_id: 'v1', work_id: 'W1', selection_status: 'candidate', work_snapshot: { genre: '시' } },
+  ]
+  const map = volumesByWork(rows)
+  expect(map.has(null)).toBe(false)
+  expect(map.has(undefined)).toBe(false)
+  expect(map.get('W1')).toEqual(['v1'])
+})

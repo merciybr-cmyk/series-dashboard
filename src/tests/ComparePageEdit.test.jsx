@@ -197,3 +197,44 @@ test('저장 직전 다시 읽기에 실패하면 편집을 유지한다', async
   expect(screen.getByText('편집 중 · 바뀐 작품 1건')).toBeInTheDocument()
   expect(api.deleteVolumeWork).not.toHaveBeenCalled()
 })
+
+test('작품 넣기 패널: 미배치 후보가 보이고, 넣기 메뉴로 넣으면 새로 표시되며 저장 때 추가된다', async () => {
+  renderPage()
+  await startEdit()
+  await userEvent.click(screen.getByRole('button', { name: '작품 넣기' }))
+  const panel = await screen.findByRole('complementary', { name: '작품 넣기 패널' })
+  expect(await within(panel).findByText('돌다리')).toBeInTheDocument()
+  expect(within(panel).queryByText('소나기')).not.toBeInTheDocument() // 이미 1권에 있음(미배치만)
+
+  await userEvent.click(within(panel).getByRole('button', { name: '「돌다리」 넣기' }))
+  const dlg = screen.getByRole('dialog', { name: '「돌다리」 넣기' })
+  await userEvent.selectOptions(within(dlg).getByLabelText('권'), 'v2')
+  expect(within(dlg).getByLabelText('부')).toHaveValue('q2')
+  await userEvent.click(within(dlg).getByRole('button', { name: '넣기' }))
+  expect(within(region('2권 오래 남을')).getByText('돌다리')).toBeInTheDocument()
+  expect(within(region('2권 오래 남을')).getByText('새로')).toBeInTheDocument()
+  expect(within(panel).queryByText('돌다리')).not.toBeInTheDocument()
+
+  await userEvent.click(screen.getByRole('button', { name: '저장' }))
+  const confirmBox = await screen.findByRole('dialog', { name: '저장 확인' })
+  expect(within(confirmBox).getByText('〈돌다리〉 → 2권 2부 (새로)')).toBeInTheDocument()
+  await clickSaveIn(confirmBox)
+  await screen.findByText('반영했습니다: 옮기기 0 · 넣기 1 · 빼기 0')
+  expect(api.insertPlacedWork).toHaveBeenCalledWith({
+    volumeId: 'v2', workId: 'W9', workSnapshot: { title: '돌다리', author: '이태준', genre: '소설', curriculum: ['4차'] },
+    partId: 'q2', batchId: null, sortOrder: 30,
+  })
+  expect(api.ensureWorkId).not.toHaveBeenCalled()
+})
+
+test('작품 데이터를 못 불러오면 패널에 오류와 다시 시도', async () => {
+  const retry = vi.fn()
+  sheetState.current = { works: [], loading: false, error: '작품 데이터를 불러올 수 없습니다 (HTTP 500)', retry }
+  renderPage()
+  await startEdit()
+  await userEvent.click(screen.getByRole('button', { name: '작품 넣기' }))
+  const panel = await screen.findByRole('complementary', { name: '작품 넣기 패널' })
+  expect(within(panel).getByText('작품 데이터를 불러올 수 없습니다 (HTTP 500)')).toBeInTheDocument()
+  await userEvent.click(within(panel).getByRole('button', { name: '다시 시도' }))
+  expect(retry).toHaveBeenCalled()
+})
