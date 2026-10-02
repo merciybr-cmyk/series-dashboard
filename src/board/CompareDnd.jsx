@@ -10,8 +10,9 @@ function Handle({ label, listeners, attributes }) {
   )
 }
 
-// 줄은 끌 수 있고, 다른 줄을 이 줄 위·아래에 끼워 넣는 놓을 곳이기도 하다 (compare-order)
-export function DraggableWorkRow({ row, ...rest }) {
+// 줄은 끌 수 있고, 다른 줄을 이 줄 위·아래에 끼워 넣는 놓을 곳이기도 하다 (compare-order).
+// droppable=false는 놓을 곳에서만 뺀다(끌 수는 있다) — 부가 있는 권의 미배정 묶음처럼 놓을 곳이 아닌 묶음의 줄
+export function DraggableWorkRow({ row, droppable = true, ...rest }) {
   const title = row.work_snapshot?.title
   const { setNodeRef: setDragRef, listeners, attributes, isDragging } = useDraggable({
     id: `row:${row.id}`,
@@ -20,6 +21,7 @@ export function DraggableWorkRow({ row, ...rest }) {
   const { setNodeRef: setDropRef } = useDroppable({
     id: `row-drop:${row.id}`,
     data: { volumeId: row.volume_id, partId: row.part_id ?? null, anchorId: row.id },
+    disabled: !droppable,
   })
   const ref = useCallback(node => {
     setDragRef(node)

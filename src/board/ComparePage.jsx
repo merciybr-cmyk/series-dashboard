@@ -481,6 +481,8 @@ export default function ComparePage() {
                   <div data-drop-clip className={`max-h-[70vh] overflow-y-auto px-2 pb-2 ${hasParts ? '' : 'pt-2'}`}>
                     {groups.map((g, i) => {
                       const key = g.part ? g.part.id : `none-${i}`
+                      // 놓을 곳: 부 안, 또는 부가 없는 권. 부가 있는 권의 미배정 묶음은 놓을 곳이 아니라 그 줄도 놓을 곳에서 뺀다
+                      const droppable = !!(g.part || !hasParts)
                       const body = (
                         <>
                           {g.label && <PartBand group={g} first={i === 0} />}
@@ -493,14 +495,14 @@ export default function ComparePage() {
                                 insertHint: dropHint?.anchorId === w.id ? dropHint.position : null,
                               }
                               return editing && !w._removed
-                                ? <DraggableWorkRow key={w.id} {...rowProps} />
+                                ? <DraggableWorkRow key={w.id} {...rowProps} droppable={droppable} />
                                 : <CompareWorkRow key={w.id} {...rowProps} />
                             })}
                             {!g.works.length && <li className="py-0.5 text-xs text-gray-300">없음</li>}
                           </ul>
                         </>
                       )
-                      return editing && (g.part || !hasParts)
+                      return editing && droppable
                         ? <DropZone key={key} volumeId={v.id} partId={g.part?.id ?? null}>{body}</DropZone>
                         : <div key={key}>{body}</div>
                     })}

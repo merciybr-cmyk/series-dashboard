@@ -1,5 +1,8 @@
+import { createElement as h } from 'react'
 import { vi } from 'vitest'
-import { visiblePointerWithin } from '../board/CompareDnd.jsx'
+import { render, screen } from '@testing-library/react'
+import { DndContext, useDndContext } from '@dnd-kit/core'
+import { visiblePointerWithin, DraggableWorkRow } from '../board/CompareDnd.jsx'
 
 const rect = (left, top, right, bottom) => ({
   left, top, right, bottom, width: right - left, height: bottom - top, x: left, y: top,
@@ -94,5 +97,33 @@ describe('visiblePointerWithin', () => {
     expect(up[1].data).toEqual({ droppableContainer: cz, value: 0 })
     const down = visiblePointerWithin({ pointerCoordinates: { x: 10, y: 55 }, droppableContainers: [cz, cr] })
     expect(down[0].data.position).toBe('after')
+  })
+})
+
+describe('DraggableWorkRow', () => {
+  const rowOf = (id, part_id) => ({
+    id, volume_id: 'v1', part_id, selection_status: 'candidate', work_snapshot: { title: `작품${id}`, genre: '소설' },
+  })
+  // dnd-kit이 충돌 판정에 쓰는(사용 가능한) 놓을 곳 목록을 렌더 중에 기록한다
+  function Probe({ out }) {
+    out.ids = useDndContext().droppableContainers.getEnabled().map(c => c.id)
+    return null
+  }
+  const mountRows = (...rows) => {
+    const out = { ids: [] }
+    render(h(DndContext, null, h(Probe, { out }), h('ul', null, ...rows)))
+    return out
+  }
+  const dragRow = (row, props) => h(DraggableWorkRow, { key: row.id, row, ...props })
+
+  test('기본은 줄도 놓을 곳이다', () => {
+    const out = mountRows(dragRow(rowOf('a', 'p1')))
+    expect(out.ids).toEqual(['row-drop:a'])
+  })
+
+  test('droppable이 false인 줄(부가 있는 권의 미배정 줄)은 놓을 곳이 아니지만 끌 수는 있다', () => {
+    const out = mountRows(dragRow(rowOf('a', 'p1')), dragRow(rowOf('b', null), { droppable: false }))
+    expect(out.ids).toEqual(['row-drop:a'])
+    expect(screen.getByRole('button', { name: '「작품b」 끌기' })).toBeInTheDocument()
   })
 })

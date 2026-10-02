@@ -11,7 +11,13 @@ vi.mock('../board/volumeApi.js', () => ({
   ensureWorkId: vi.fn(), insertPlacedWork: vi.fn(), listRegistry: vi.fn(), listPicks: vi.fn(),
 }))
 vi.mock('../board/exportCompare.js', () => ({ downloadCompareExcel: vi.fn() }))
+// useDroppable은 그대로 동작시키되 어떤 인자로 불렸는지 본다 (놓을 곳 등록 여부 확인용)
+vi.mock('@dnd-kit/core', async importOriginal => {
+  const actual = await importOriginal()
+  return { ...actual, useDroppable: vi.fn(actual.useDroppable) }
+})
 const api = await import('../board/volumeApi.js')
+const { useDroppable } = await import('@dnd-kit/core')
 const { default: ComparePage } = await import('../board/ComparePage.jsx')
 const { ToastProvider } = await import('../components/Toast.jsx')
 
@@ -335,4 +341,19 @@ test('검색 패널의 넣기 메뉴에는 위로·아래로가 없다', async (
   await userEvent.click(await within(panel).findByRole('button', { name: '「돌다리」 넣기' }))
   const dlg = screen.getByRole('dialog', { name: '「돌다리」 넣기' })
   expect(within(dlg).queryByRole('button', { name: '위로' })).not.toBeInTheDocument()
+})
+
+test('부가 있는 권의 미배정 줄은 끌 수는 있어도 놓을 곳이 아니다 (부 없는 권의 줄·부 안의 줄은 놓을 곳)', async () => {
+  // 1권에는 부가 있는데 부 없는 줄 f(미배정), 3권에는 부가 아예 없고 줄 g가 있다
+  const F = { id: 'f', volume_id: 'v1', work_id: 'W7', part_id: null, sort_order: 30, selection_status: 'candidate', work_snapshot: snap('메밀꽃 필 무렵', '이효석', '소설', ['2차']) }
+  const G = { id: 'g', volume_id: 'v3', work_id: 'W8', part_id: null, sort_order: 10, selection_status: 'candidate', work_snapshot: snap('동백꽃', '김유정', '소설', ['2차']) }
+  api.listVolumes.mockResolvedValue([...VOLUMES, { id: 'v3', number: 3, title: '부 없는 권', status: '기획', curricula: ['2차'] }])
+  api.listAllVolumeWorks.mockResolvedValue([...VW, F, G])
+  renderPage()
+  await startEdit()
+  expect(screen.getByRole('button', { name: '「메밀꽃 필 무렵」 끌기' })).toBeInTheDocument()
+  const lastCall = id => useDroppable.mock.calls.map(c => c[0]).filter(o => o.id === `row-drop:${id}`).at(-1)
+  expect(lastCall('f').disabled).toBe(true)
+  expect(lastCall('a').disabled).toBe(false)
+  expect(lastCall('g').disabled).toBe(false)
 })
