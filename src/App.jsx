@@ -26,7 +26,7 @@ function AuthCallback() {
 
 // 2026-10-02: 권별 비교 편집 중 나가기 방지(useBlocker)에 데이터 라우터가 필요해 HashRouter에서 전환.
 // 경로·인증 감싸기·캐치올(AuthCallback) 동작은 그대로.
-// 라우터는 마운트당 한 번만 생성(useState)되며, 테스트가 모듈 임포트 후 location.hash를 설정하기 때문에 렌더링마다 새로 생성해야 함.
+// 라우터는 모듈 로드 때가 아니라 마운트 때(마운트당 한 번, useState) 만든다 — 테스트가 App을 임포트한 뒤 location.hash를 설정하기 때문.
 function createAppRouter() {
   return createHashRouter([
     { path: '/login', element: <LoginPage /> },

@@ -44,7 +44,7 @@ export default function CompareWorkRow({
     <li ref={ref} className={cls}>
       {leading}
       <EraChip era={eraOf(s.genre) || '기타'} />
-      <span className={`min-w-0 flex-1 truncate ${removed ? 'text-gray-400 line-through' : ''}`}>
+      <span title={`${s.title} ${s.author || ''}`.trim()} className={`min-w-0 flex-1 truncate ${removed ? 'text-gray-400 line-through' : ''}`}>
         <span>{s.title}</span>
         <span className="ml-1 text-xs text-gray-400">{s.author}</span>
       </span>
