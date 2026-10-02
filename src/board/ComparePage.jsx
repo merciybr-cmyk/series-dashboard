@@ -35,10 +35,12 @@ const newTempId = () => `new-${++tempSeq}`
 const SAVE_API = { updateVolumeWork, deleteVolumeWork, ensureWorkId, insertPlacedWork }
 
 function SaveResult({ result, onClose }) {
+  const failed = result.failed.length > 0
   return (
-    <div role="status" className="mb-3 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm">
+    <div role="status"
+      className={`mb-3 rounded border px-3 py-2 text-sm ${failed ? 'border-amber-300 bg-amber-50' : 'border-green-200 bg-green-50'}`}>
       <div className="flex items-center">
-        <span className="font-semibold text-green-800">{resultSummary(result)}</span>
+        <span className={`font-semibold ${failed ? 'text-amber-800' : 'text-green-800'}`}>{resultSummary(result)}</span>
         <button type="button" onClick={onClose} className="ml-auto text-xs text-gray-500 underline">닫기</button>
       </div>
       {result.skipped.length > 0 && (
@@ -250,26 +252,35 @@ export default function ComparePage() {
     }
   }
 
-  // 설계 §3.2: 최신 상태를 다시 읽고 → 계획 → 한 건씩 반영 → 결과 표시 → 새로 읽고 편집 끝
+  // 설계 §3.2: 최신 상태를 다시 읽고 → 계획 → 한 건씩 반영 → 새로 읽고 → 결과 표시·편집 끝
   async function confirmSave() {
     setSaving(true)
-    let latestRows
-    let latestParts
     try {
-      ;[latestRows, latestParts] = await Promise.all([listAllVolumeWorks(), listAllParts()])
+      let latestRows
+      let latestParts
+      try {
+        ;[latestRows, latestParts] = await Promise.all([listAllVolumeWorks(), listAllParts()])
+      } catch (err) {
+        show(err.message) // 편집 내용은 그대로 — 다시 저장할 수 있다
+        return
+      }
+      const plan = planSave({ draft, baseline, latestRows, latestParts })
+      const result = await runSave(plan, SAVE_API, { registryMap: lookup.registryMap })
+      // 새로 읽은 뒤에 편집을 끝낸다 — 저장 전 데이터 위에 결과 배너가 뜨지 않게
+      try {
+        await load()
+      } catch (err) {
+        show(err.message)
+      }
+      setSaveResult(result)
+      setSaveOpen(false)
+      finishEdit()
+      lookup.refresh()
     } catch (err) {
-      show(err.message) // 편집 내용은 그대로 — 다시 저장할 수 있다
+      show(err.message) // 계획·반영 중 예상 못 한 예외 — 편집 내용과 저장 창은 그대로 둔다
+    } finally {
       setSaving(false)
-      return
     }
-    const plan = planSave({ draft, baseline, latestRows, latestParts })
-    const result = await runSave(plan, SAVE_API, { registryMap: lookup.registryMap })
-    setSaving(false)
-    setSaveOpen(false)
-    setSaveResult(result)
-    finishEdit()
-    lookup.refresh()
-    load().catch(err => show(err.message))
   }
 
   function togglePanel() {
@@ -466,7 +477,7 @@ export default function ComparePage() {
           />
         )}
       </div>
-      <DragOverlay>
+      <DragOverlay dropAnimation={null}>
         {dragging && (
           <div className="rounded border border-blue-300 bg-white px-2 py-1 text-sm shadow-lg">{dragging.title}</div>
         )}

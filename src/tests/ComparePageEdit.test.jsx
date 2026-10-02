@@ -181,7 +181,7 @@ test('저장: 확인 창에 요약·목록·딸린 업무 경고를 보이고, �
   await clickSaveIn(confirmBox)
   expect(await screen.findByText('반영했습니다: 옮기기 1 · 넣기 0 · 빼기 1')).toBeInTheDocument()
   expect(api.deleteVolumeWork).toHaveBeenCalledWith('d')
-  expect(api.updateVolumeWork).toHaveBeenCalledWith('a', { volume_id: 'v2', part_id: 'q2', sort_order: 20 })
+  expect(api.updateVolumeWork).toHaveBeenCalledWith('a', { volume_id: 'v2', part_id: 'q2', sort_order: 20, placement_batch_id: null })
   expect(screen.getByRole('button', { name: '편집' })).toBeInTheDocument()
   expect(api.listAllVolumeWorks).toHaveBeenCalledTimes(4) // 처음·편집 시작·저장 직전·저장 뒤
 })
@@ -196,6 +196,45 @@ test('저장 직전 다시 읽기에 실패하면 편집을 유지한다', async
   expect(await screen.findByText('연결이 끊겼습니다')).toBeInTheDocument()
   expect(screen.getByText('편집 중 · 바뀐 작품 1건')).toBeInTheDocument()
   expect(api.deleteVolumeWork).not.toHaveBeenCalled()
+})
+
+test('저장 계획을 세우다 예외가 나도 편집 내용은 그대로, 저장 창은 다시 쓸 수 있다', async () => {
+  renderPage()
+  await startEdit()
+  const dlg = await openMenu('1권 첫 장면', '소나기')
+  await userEvent.selectOptions(within(dlg).getByLabelText('권'), 'v2')
+  await userEvent.click(within(dlg).getByRole('button', { name: '옮기기' }))
+  api.listAllParts.mockResolvedValueOnce(null) // 저장 직전 다시 읽기가 비정상 응답 → planSave에서 예외
+  await userEvent.click(screen.getByRole('button', { name: '저장' }))
+  const confirmBox = await screen.findByRole('dialog', { name: '저장 확인' })
+  await clickSaveIn(confirmBox)
+  expect(await screen.findByText(/Cannot read properties of null/)).toBeInTheDocument()
+  expect(screen.getByText('편집 중 · 바뀐 작품 1건')).toBeInTheDocument()
+  expect(within(confirmBox).getByRole('button', { name: '저장' })).toBeEnabled()
+  expect(within(confirmBox).getByRole('button', { name: '돌아가기' })).toBeEnabled()
+  expect(api.updateVolumeWork).not.toHaveBeenCalled()
+})
+
+test('저장 뒤 새로 읽기가 끝난 다음에 편집을 끝내고 결과를 보인다', async () => {
+  renderPage()
+  await startEdit()
+  await userEvent.click(within(await openMenu('1권 첫 장면', '소나기')).getByRole('button', { name: '권에서 빼기' }))
+  let finishReload
+  api.listAllVolumeWorks
+    .mockResolvedValueOnce(VW) // 저장 직전
+    .mockReturnValueOnce(new Promise(resolve => { finishReload = () => resolve(VW.filter(r => r.id !== 'a')) })) // 저장 뒤
+  await userEvent.click(screen.getByRole('button', { name: '저장' }))
+  await clickSaveIn(await screen.findByRole('dialog', { name: '저장 확인' }))
+  await waitFor(() => expect(api.deleteVolumeWork).toHaveBeenCalledWith('a'))
+  await waitFor(() => expect(api.listAllVolumeWorks).toHaveBeenCalledTimes(4))
+  // 새로 읽는 동안에는 아직 편집 화면 (저장 전 데이터 위에 결과 배너가 뜨지 않는다)
+  expect(screen.getByText(/편집 중/)).toBeInTheDocument()
+  expect(screen.queryByText(/반영했습니다/)).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '저장 중…' })).toBeDisabled()
+  await act(async () => { finishReload() })
+  expect(await screen.findByText('반영했습니다: 옮기기 0 · 넣기 0 · 빼기 1')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '편집' })).toBeInTheDocument()
+  expect(within(region('1권 첫 장면')).queryByText('소나기')).not.toBeInTheDocument()
 })
 
 test('작품 넣기 패널: 미배치 후보가 보이고, 넣기 메뉴로 넣으면 새로 표시되며 저장 때 추가된다', async () => {

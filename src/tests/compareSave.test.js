@@ -43,6 +43,30 @@ describe('planSave', () => {
     expect(plan.moves.map(m => m.id)).toEqual(['a'])
   })
 
+  test('빼기: 그사이 다른 분이 옮긴 행은 지우지 않고 건너뛴다', () => {
+    const base = [...BASE, row('x', 'v2', 'W9', 'q1')]
+    const draft = removeRow(EMPTY_DRAFT, 'x')
+    const latest = [...BASE, row('x', 'v1', 'W9', 'p1')] // x를 다른 분이 1권 1부로 옮김
+    const plan = planSave({ draft, baseline: base, latestRows: latest, latestParts: PARTS })
+    expect(plan.removes).toEqual([])
+    expect(plan.skipped).toEqual([{ title: '작품x', reason: '그사이 다른 분이 옮기거나 뺐습니다' }])
+    expect(plan.alreadyRemoved).toBe(0)
+  })
+
+  test('빼기: 건너뛴 행은 그 자리를 계속 차지한다 (같은 작품 넣기는 막힌다)', () => {
+    const base = [...BASE, row('x', 'v2', 'W9', 'q1')]
+    let draft = removeRow(EMPTY_DRAFT, 'x')
+    draft = addWork(draft, { tempId: 'n1', workId: 'W9', key: 'k9', work: SHEET, curricula: [], volumeId: 'v2', partId: 'q2' })
+    const latest = [...BASE, row('x', 'v2', 'W9', 'q2')] // x가 같은 권 안에서 부만 바뀜
+    const plan = planSave({ draft, baseline: base, latestRows: latest, latestParts: PARTS })
+    expect(plan.removes).toEqual([])
+    expect(plan.adds).toEqual([])
+    expect(plan.skipped).toEqual([
+      { title: '작품x', reason: '그사이 다른 분이 옮기거나 뺐습니다' },
+      { title: '돌다리', reason: '그사이 같은 작품이 들어왔습니다' },
+    ])
+  })
+
   test('옮길 부가 삭제되었으면 건너뛰고, 이미 지워진 빼기는 성공으로 센다', () => {
     const draft = removeRow(moveRow(EMPTY_DRAFT, BASE, 'a', 'v2', 'q2'), 'c')
     const latest = [row('a', 'v1', 'W1', 'p1'), row('b', 'v1', 'W2', 'p2')] // c는 이미 지워짐
@@ -85,7 +109,7 @@ describe('runSave', () => {
     }
     const result = await runSave(plan, api, { registryMap: new Map() })
     expect(calls).toEqual(['del x', 'upd a', 'ins W100'])
-    expect(api.updateVolumeWork).toHaveBeenCalledWith('a', { volume_id: 'v2', part_id: 'q2', sort_order: 40 })
+    expect(api.updateVolumeWork).toHaveBeenCalledWith('a', { volume_id: 'v2', part_id: 'q2', sort_order: 40, placement_batch_id: null })
     expect(api.ensureWorkId).toHaveBeenCalledWith(SHEET, ['7차'], expect.any(Map))
     expect(api.insertPlacedWork).toHaveBeenCalledWith({
       volumeId: 'v2', workId: 'W100', workSnapshot: { title: '돌다리' }, partId: 'q2', batchId: null, sortOrder: 50,

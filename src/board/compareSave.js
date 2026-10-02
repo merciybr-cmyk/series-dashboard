@@ -12,25 +12,30 @@ export function planSave({ draft, baseline, latestRows, latestParts }) {
   const baseById = new Map(baseline.map(r => [r.id, r]))
   const titleOf = id => baseById.get(id)?.work_snapshot?.title
 
+  // 편집을 시작한 뒤 다른 분이 권·부를 바꾼 행인가 (옮기기·빼기 모두 이런 행은 건드리지 않는다)
+  const changedSince = (base, latest) =>
+    !base || latest.volume_id !== base.volume_id || (latest.part_id ?? null) !== (base.part_id ?? null)
+
+  const skipped = []
   const removes = []
   let alreadyRemoved = 0
   for (const id of Object.keys(draft.removes)) {
-    if (latestById.has(id)) removes.push({ id, title: titleOf(id) })
-    else alreadyRemoved++
+    const latest = latestById.get(id)
+    if (!latest) alreadyRemoved++
+    else if (changedSince(baseById.get(id), latest)) skipped.push({ title: titleOf(id), reason: MOVED_AWAY })
+    else removes.push({ id, title: titleOf(id) })
   }
-  const removing = new Set(removes.map(r => r.id))
+  const removing = new Set(removes.map(r => r.id)) // 실제로 지울 행만 자리를 비운다
   const partOk = (volumeId, partId) =>
     partId == null || latestParts.some(p => p.id === partId && p.volume_id === volumeId)
   // 저장 뒤에도 남을 행이 차지하는 (권, 작품) 자리
   const occupied = new Set(latestRows.filter(r => !removing.has(r.id)).map(r => slot(r.volume_id, r.work_id)))
 
-  const skipped = []
   const candidates = []
   for (const [id, target] of Object.entries(draft.moves)) {
-    const base = baseById.get(id)
     const latest = latestById.get(id)
     const title = titleOf(id)
-    if (!base || !latest || latest.volume_id !== base.volume_id || (latest.part_id ?? null) !== (base.part_id ?? null)) {
+    if (!latest || changedSince(baseById.get(id), latest)) {
       skipped.push({ title, reason: MOVED_AWAY })
       continue
     }
@@ -107,7 +112,10 @@ export async function runSave(plan, api, { registryMap }) {
     const retry = []
     for (const m of pending) {
       try {
-        await api.updateVolumeWork(m.id, { volume_id: m.volumeId, part_id: m.partId, sort_order: m.sortOrder })
+        // 옮긴 행은 사람이 고친 것이다 — 자동 배치 되돌리기가 새 권에서 지우지 않도록 묶음에서 뺀다
+        await api.updateVolumeWork(m.id, {
+          volume_id: m.volumeId, part_id: m.partId, sort_order: m.sortOrder, placement_batch_id: null,
+        })
         result.moved++
       } catch (err) {
         if (pass === 0 && isDuplicate(err)) retry.push(m) // 다른 옮기기가 자리를 비운 뒤 다시
