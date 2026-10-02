@@ -15,7 +15,7 @@ import {
 import {
   EMPTY_DRAFT, changeCount, effectiveRows, moveRow, removeRow, revertRow, addWork,
   canPlace, placeErrorText, defaultPartFor, describeDraft, resolveDrop, toDropActive,
-  groupOrder, moveInGroup, revertGroupOrder, resolveAnchor,
+  moveInGroup, revertGroupOrder, resolveAnchor,
 } from './compareEdit.js'
 import { groupKeyOfRow, eraKeyOf } from './compareOrder.js'
 import { DraggableWorkRow, DraggableSheetItem, DropZone, visiblePointerWithin } from './CompareDnd.jsx'
@@ -167,6 +167,19 @@ export default function ComparePage() {
   // 편집 중에는 편집 시작 때 읽은 상태(baseline)에 draft를 반영해 보여 준다 — 다른 사람의 변경은 저장 때 맞춘다
   const rows = useMemo(() => (editing ? effectiveRows(baseline, draft) : allVw), [editing, baseline, draft, allVw])
   const dirtyCount = editing ? changeCount(draft) : 0
+  // 묶음 키 → 지금 화면 순서의 행 id. 줄마다 묶음을 다시 세지 않고 한 번에 모아 둔다 (메뉴의 위로·아래로 판정용)
+  const groupOrders = useMemo(() => {
+    const byGroup = new Map()
+    for (const r of rows) {
+      if (r._removed) continue
+      const k = groupKeyOfRow(r)
+      if (!byGroup.has(k)) byGroup.set(k, [])
+      byGroup.get(k).push(r)
+    }
+    const out = new Map()
+    for (const [k, list] of byGroup) out.set(k, list.sort((a, b) => a.sort_order - b.sort_order).map(r => r.id))
+    return out
+  }, [rows])
   const numberById = useMemo(() => Object.fromEntries(volumes.map(v => [v.id, v.number])), [volumes])
   const partById = useMemo(() => new Map(allParts.map(p => [p.id, p])), [allParts])
   const partsByVolume = useMemo(() => {
@@ -372,7 +385,7 @@ export default function ComparePage() {
     }
     const title = row.work_snapshot?.title
     const key = groupKeyOfRow(row)
-    const ids = groupOrder(rows, key)
+    const ids = groupOrders.get(key) || []
     const i = ids.indexOf(row.id)
     return (
       <CompareMoveMenu
