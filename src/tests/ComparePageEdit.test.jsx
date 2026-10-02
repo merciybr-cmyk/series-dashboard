@@ -152,3 +152,48 @@ test('저장하지 않고 다른 화면으로 가려 하면 확인을 묻는다'
   expect(await screen.findByText('홈 화면')).toBeInTheDocument()
   confirm.mockRestore()
 })
+
+// 확인 창의 저장 버튼은 딸린 자료 조회가 끝나야 켜진다
+async function clickSaveIn(confirmBox) {
+  const btn = within(confirmBox).getByRole('button', { name: '저장' })
+  await waitFor(() => expect(btn).toBeEnabled())
+  await userEvent.click(btn)
+}
+
+test('저장: 확인 창에 요약·목록·딸린 업무 경고를 보이고, 저장하면 반영한 뒤 결과를 알린다', async () => {
+  api.listAttachmentRefs.mockResolvedValue({ tasks: ['d'], comments: [], files: [] })
+  renderPage()
+  await startEdit()
+  let dlg = await openMenu('1권 첫 장면', '소나기')
+  await userEvent.selectOptions(within(dlg).getByLabelText('권'), 'v2')
+  await userEvent.click(within(dlg).getByRole('button', { name: '옮기기' }))
+  dlg = await openMenu('2권 오래 남을', '산유화')
+  await userEvent.click(within(dlg).getByRole('button', { name: '권에서 빼기' }))
+
+  await userEvent.click(screen.getByRole('button', { name: '저장' }))
+  const confirmBox = await screen.findByRole('dialog', { name: '저장 확인' })
+  expect(within(confirmBox).getByText('옮기기 1 · 넣기 0 · 빼기 1')).toBeInTheDocument()
+  expect(within(confirmBox).getByText('〈소나기〉 1권 2부 → 2권 2부')).toBeInTheDocument()
+  expect(within(confirmBox).getByText('〈산유화〉 2권 1부에서 빼기')).toBeInTheDocument()
+  expect(await within(confirmBox).findByText('업무 1건이 함께 지워집니다')).toBeInTheDocument()
+  expect(api.listAttachmentRefs).toHaveBeenCalledWith(['d'])
+
+  await clickSaveIn(confirmBox)
+  expect(await screen.findByText('반영했습니다: 옮기기 1 · 넣기 0 · 빼기 1')).toBeInTheDocument()
+  expect(api.deleteVolumeWork).toHaveBeenCalledWith('d')
+  expect(api.updateVolumeWork).toHaveBeenCalledWith('a', { volume_id: 'v2', part_id: 'q2', sort_order: 20 })
+  expect(screen.getByRole('button', { name: '편집' })).toBeInTheDocument()
+  expect(api.listAllVolumeWorks).toHaveBeenCalledTimes(4) // 처음·편집 시작·저장 직전·저장 뒤
+})
+
+test('저장 직전 다시 읽기에 실패하면 편집을 유지한다', async () => {
+  renderPage()
+  await startEdit()
+  await userEvent.click(within(await openMenu('1권 첫 장면', '소나기')).getByRole('button', { name: '권에서 빼기' }))
+  api.listAllVolumeWorks.mockRejectedValueOnce(new Error('연결이 끊겼습니다'))
+  await userEvent.click(screen.getByRole('button', { name: '저장' }))
+  await clickSaveIn(await screen.findByRole('dialog', { name: '저장 확인' }))
+  expect(await screen.findByText('연결이 끊겼습니다')).toBeInTheDocument()
+  expect(screen.getByText('편집 중 · 바뀐 작품 1건')).toBeInTheDocument()
+  expect(api.deleteVolumeWork).not.toHaveBeenCalled()
+})

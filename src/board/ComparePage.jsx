@@ -3,21 +3,49 @@
 // 2026-10-02: 작품 줄 경고, 편집 모드(옮기기·빼기·넣기를 모았다가 저장) — docs/superpowers/specs/2026-10-02-compare-edit-design.md
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useBlocker } from 'react-router-dom'
-import { listVolumes, listAllVolumeWorks, listAllParts } from './volumeApi.js'
+import {
+  listVolumes, listAllVolumeWorks, listAllParts, listAttachmentRefs,
+  updateVolumeWork, deleteVolumeWork, ensureWorkId, insertPlacedWork,
+} from './volumeApi.js'
 import { eraSummary } from './genreUtils.js'
 import {
   buildCompareColumns, compareSummary, compareWarnings, totalOf, volumesByWork as buildVolumesByWork,
 } from './compareUtils.js'
 import {
   EMPTY_DRAFT, changeCount, effectiveRows, moveRow, removeRow, revertRow,
-  canPlace, placeErrorText, defaultPartFor,
+  canPlace, placeErrorText, defaultPartFor, describeDraft,
 } from './compareEdit.js'
+import { planSave, runSave, countAttachments, resultSummary } from './compareSave.js'
+import CompareSaveDialog from './CompareSaveDialog.jsx'
 import CompareWorkRow, { EraChip } from './CompareWorkRow.jsx'
 import CompareMoveMenu from './CompareMoveMenu.jsx'
 import { useToast } from '../components/Toast.jsx'
 import { downloadCompareExcel } from './exportCompare.js'
 
 const leaveText = n => `저장하지 않은 변경 ${n}건이 있습니다. 나가면 사라집니다.`
+
+const SAVE_API = { updateVolumeWork, deleteVolumeWork, ensureWorkId, insertPlacedWork }
+
+function SaveResult({ result, onClose }) {
+  return (
+    <div role="status" className="mb-3 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm">
+      <div className="flex items-center">
+        <span className="font-semibold text-green-800">{resultSummary(result)}</span>
+        <button type="button" onClick={onClose} className="ml-auto text-xs text-gray-500 underline">닫기</button>
+      </div>
+      {result.skipped.length > 0 && (
+        <ul className="mt-1 text-xs text-gray-600">
+          {result.skipped.map((s, i) => <li key={`s${i}`}>건너뜀: 〈{s.title}〉 — {s.reason}</li>)}
+        </ul>
+      )}
+      {result.failed.length > 0 && (
+        <ul className="mt-1 text-xs text-red-600">
+          {result.failed.map((f, i) => <li key={`f${i}`}>실패: 〈{f.title}〉 — {f.reason}</li>)}
+        </ul>
+      )}
+    </div>
+  )
+}
 
 function EraBar({ counts }) {
   const total = totalOf(counts)
@@ -98,6 +126,10 @@ export default function ComparePage() {
   const [editing, setEditing] = useState(false)
   const [baseline, setBaseline] = useState([])
   const [draft, setDraft] = useState(EMPTY_DRAFT)
+  const [saveOpen, setSaveOpen] = useState(false)
+  const [attachments, setAttachments] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [saveResult, setSaveResult] = useState(null)
   const { show } = useToast()
 
   const load = useCallback(async () => {
@@ -170,6 +202,7 @@ export default function ComparePage() {
       const vw = await load()
       setBaseline(vw)
       setDraft(EMPTY_DRAFT)
+      setSaveResult(null)
       setEditing(true)
     } catch (err) {
       show(err.message)
@@ -184,6 +217,38 @@ export default function ComparePage() {
   function cancelEdit() {
     if (dirtyCount && !window.confirm(leaveText(dirtyCount))) return
     finishEdit()
+  }
+
+  async function openSave() {
+    setSaveOpen(true)
+    setAttachments(null)
+    try {
+      setAttachments(countAttachments(await listAttachmentRefs(Object.keys(draft.removes))))
+    } catch (err) {
+      show(err.message)
+      setSaveOpen(false)
+    }
+  }
+
+  // 설계 §3.2: 최신 상태를 다시 읽고 → 계획 → 한 건씩 반영 → 결과 표시 → 새로 읽고 편집 끝
+  async function confirmSave() {
+    setSaving(true)
+    let latestRows
+    let latestParts
+    try {
+      ;[latestRows, latestParts] = await Promise.all([listAllVolumeWorks(), listAllParts()])
+    } catch (err) {
+      show(err.message) // 편집 내용은 그대로 — 다시 저장할 수 있다
+      setSaving(false)
+      return
+    }
+    const plan = planSave({ draft, baseline, latestRows, latestParts })
+    const result = await runSave(plan, SAVE_API, { registryMap: new Map() })
+    setSaving(false)
+    setSaveOpen(false)
+    setSaveResult(result)
+    finishEdit()
+    load().catch(err => show(err.message))
   }
 
   function rowTrailing(row) {
@@ -221,6 +286,8 @@ export default function ComparePage() {
       <div className="ml-auto flex gap-2">
         <button type="button" onClick={cancelEdit}
           className="rounded border border-gray-300 bg-white px-3 py-1 text-sm text-gray-600">취소</button>
+        <button type="button" onClick={openSave} disabled={!dirtyCount}
+          className="rounded bg-blue-600 px-3 py-1 text-sm font-medium text-white disabled:opacity-40">저장</button>
       </div>
     </div>
   ) : (
@@ -255,6 +322,7 @@ export default function ComparePage() {
   return (
     <div>
       {header}
+      {saveResult && <SaveResult result={saveResult} onClose={() => setSaveResult(null)} />}
       <div className="flex items-start gap-4">
         <div className="@container min-w-0 flex-1">
           <SummaryTable columns={columns} />
@@ -297,6 +365,16 @@ export default function ComparePage() {
           </div>
         </div>
       </div>
+      {saveOpen && (
+        <CompareSaveDialog
+          items={describeDraft(draft, baseline, place)}
+          attachments={attachments}
+          warnings={warnings}
+          saving={saving}
+          onConfirm={confirmSave}
+          onCancel={() => setSaveOpen(false)}
+        />
+      )}
     </div>
   )
 }
