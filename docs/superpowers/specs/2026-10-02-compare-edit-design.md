@@ -125,7 +125,7 @@
 | `src/board/compareSave.js` (신규) | `planSave({ draft, baseline, latestRows, latestParts })` 순수 → `{ removes, moves, adds, skipped }`; `runSave(plan, api)` → `{ done: {moved, added, removed}, skipped, failed }` (23505 옮기기 1회 재시도) |
 | `src/board/compareUtils.js` | `buildCompareColumns`가 `_removed` 행을 표시하되 편수·비율에서 제외; `volumesByWork`도 `_removed` 제외; `compareWarnings` 추가 |
 | `src/board/ComparePage.jsx` | 보기/편집 모드, 상단 바, 경고 뱃지, 확인 창·결과 표시. 커지면 `CompareEditBar.jsx`·`CompareWorkRow.jsx`·`SaveDialog.jsx`로 분리 |
-| `src/board/SearchPane.jsx` | 선택 props 추가: `defaultOnlyUnplaced`(기본 false), `renderAction(work, curricula)`(주면 '추가' 버튼 대신 그 노드 — 비교 화면은 '넣기' 메뉴), `wrapItem(key, work, curricula, node)`(주면 결과 줄을 감쌈 — 비교 화면은 끌기 가능한 래퍼). 기존 호출부 동작 불변 |
+| `src/board/SearchPane.jsx` | 선택 props 추가: `defaultOnlyUnplaced`(기본 false), `renderAction(work, getCurricula)`(주면 '추가' 버튼 대신 그 노드 — 비교 화면은 '넣기' 메뉴), `itemComponent`(결과 줄 `<li>`를 대신 그리는 컴포넌트, props `itemKey·work·getCurricula·className·children` — 비교 화면은 끌기 가능한 줄). 교육과정 목록은 결과마다 미리 계산하지 않고 `getCurricula()`로 필요할 때 계산. 기존 호출부 동작 불변 |
 | `src/board/homeUtils.js` | §3.3 문구·묶기, `ctx` 선택 인자 |
 | `src/pages/HomePage.jsx` | `ctx` 만들어 넘김 |
 | `src/App.jsx` | 데이터 라우터 전환 |
