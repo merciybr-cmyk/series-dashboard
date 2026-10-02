@@ -81,4 +81,18 @@ describe('visiblePointerWithin', () => {
     const out = visiblePointerWithin({ pointerCoordinates: { x: 150, y: 150 }, droppableContainers: [ca, cb] })
     expect(out).toEqual([{ id: 'drop:8:p2', data: { droppableContainer: cb, value: 0 } }])
   })
+
+  test('줄(anchorId가 있는 놓을 곳)은 부보다 먼저, 포인터가 줄 가운데보다 위면 before·아래면 after', () => {
+    const clip = stub(mount(root, 'data-drop-clip'), [0, 0, 300, 500])
+    const zone = stub(mount(clip), [0, 0, 300, 200])
+    const rowEl = stub(mount(zone), [0, 40, 300, 60])
+    const cz = container('drop:1:p2', zone)
+    const cr = { ...container('row-drop:a', rowEl), data: { current: { anchorId: 'a' } } }
+    const up = visiblePointerWithin({ pointerCoordinates: { x: 10, y: 45 }, droppableContainers: [cz, cr] })
+    expect(up.map(c => c.id)).toEqual(['row-drop:a', 'drop:1:p2'])
+    expect(up[0].data).toEqual({ droppableContainer: cr, value: 0, position: 'before' })
+    expect(up[1].data).toEqual({ droppableContainer: cz, value: 0 })
+    const down = visiblePointerWithin({ pointerCoordinates: { x: 10, y: 55 }, droppableContainers: [cz, cr] })
+    expect(down[0].data.position).toBe('after')
+  })
 })

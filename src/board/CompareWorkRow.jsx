@@ -29,7 +29,8 @@ function warningTitle(key, genre) {
 }
 
 export default function CompareWorkRow({
-  row, others = [], warnings = [], fromLabel = null, leading = null, trailing = null, dragging = false, ref,
+  row, others = [], warnings = [], fromLabel = null, leading = null, trailing = null, dragging = false,
+  insertHint = null, ref,
 }) {
   const s = row.work_snapshot || {}
   const removed = !!row._removed
@@ -39,6 +40,9 @@ export default function CompareWorkRow({
     isDup ? 'bg-amber-50' : '',
     row._moved ? 'border-l-4 border-blue-500' : '',
     dragging ? 'opacity-40' : '',
+    // 끌기 중 '들어갈 자리' 선 — 테두리 대신 그림자라 줄 높이가 흔들리지 않는다 (compare-order)
+    insertHint === 'before' ? 'shadow-[inset_0_2px_0_0_#2563eb]' : '',
+    insertHint === 'after' ? 'shadow-[inset_0_-2px_0_0_#2563eb]' : '',
   ].filter(Boolean).join(' ')
   return (
     <li ref={ref} className={cls}>
