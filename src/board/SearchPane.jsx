@@ -5,14 +5,22 @@ import { workKeyOf, curriculaOf, sortCurricula } from '../works/workKey.js'
 import { SELECTION_LABELS } from './constants.js'
 import MultiSelectDropdown from './MultiSelectDropdown.jsx'
 
-// pickKeys(Set)가 주어지면 "갈래 후보만" 토글이 나타나고 기본 ON — 후보 풀에서만 검색 (2026-08-26)
-export default function SearchPane({ works, duplicatesByKey, onAdd, pickKeys = null }) {
+function PlainItem({ className, children }) {
+  return <li className={className}>{children}</li>
+}
+
+// renderAction(work, getCurricula): '추가' 버튼 대신 그릴 것 / itemComponent: 결과 줄(li)을 대신 그릴 컴포넌트 (2026-10-02 권별 비교)
+// 교육과정 목록은 결과마다 미리 계산하지 않고 getCurricula()로 필요할 때 계산한다.
+export default function SearchPane({
+  works, duplicatesByKey, onAdd, pickKeys = null,
+  defaultOnlyUnplaced = false, renderAction = null, itemComponent: Item = PlainItem,
+}) {
   const [query, setQuery] = useState('')
   const [curriculum, setCurriculum] = useState([])
   const [genre, setGenre] = useState([])
   const [sortByCount, setSortByCount] = useState(false)
   const [onlyPicks, setOnlyPicks] = useState(true)
-  const [onlyUnplaced, setOnlyUnplaced] = useState(false)
+  const [onlyUnplaced, setOnlyUnplaced] = useState(defaultOnlyUnplaced)
 
   const curriculumOptions = useMemo(() => sortCurricula(getUniqueValues(works, '교육과정')), [works])
   const genreOptions = useMemo(() => getUniqueValues(works, '장르'), [works])
@@ -89,8 +97,10 @@ export default function SearchPane({ works, duplicatesByKey, onAdd, pickKeys = n
       <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
         {grouped.map(([key, { rep: w }]) => {
           const dups = duplicatesByKey.get(key) || []
+          const getCurricula = () => curriculaOf(works, key)
           return (
-            <li key={key} className="flex items-center gap-2 rounded border border-gray-100 px-3 py-2 text-sm">
+            <Item key={key} itemKey={key} work={w} getCurricula={getCurricula}
+              className="flex items-center gap-2 rounded border border-gray-100 px-3 py-2 text-sm">
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium">{w['작품명']}</div>
                 <div className="truncate text-xs text-gray-500">
@@ -106,14 +116,16 @@ export default function SearchPane({ works, duplicatesByKey, onAdd, pickKeys = n
                   {d.volumeNumber}권 {SELECTION_LABELS[d.selection_status]}
                 </span>
               ))}
-              <button
-                type="button"
-                onClick={() => onAdd(w, curriculaOf(works, key))}
-                className="shrink-0 rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white"
-              >
-                추가
-              </button>
-            </li>
+              {renderAction ? renderAction(w, getCurricula) : (
+                <button
+                  type="button"
+                  onClick={() => onAdd(w, getCurricula())}
+                  className="shrink-0 rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white"
+                >
+                  추가
+                </button>
+              )}
+            </Item>
           )
         })}
       </ul>
