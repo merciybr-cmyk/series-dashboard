@@ -71,3 +71,84 @@ test('보기 모드에서도 경고 뱃지를 보여 준다', async () => {
   expect(within(region('2권 오래 남을')).getByText('⚠ 수록 이력 없음')).toBeInTheDocument() // 학(5차)은 2권(4차)에 이력 없음
   expect(within(region('1권 첫 장면')).queryByText(/⚠ 부 확인/)).not.toBeInTheDocument()
 })
+
+async function startEdit() {
+  await userEvent.click(await screen.findByRole('button', { name: '편집' }))
+  await screen.findByText(/편집 중/)
+}
+async function openMenu(regionName, title) {
+  await userEvent.click(within(region(regionName)).getByRole('button', { name: `「${title}」 메뉴` }))
+  return screen.getByRole('dialog', { name: `「${title}」 메뉴` })
+}
+
+test('편집을 누르면 새로 읽고, 편집 중 바와 작품 메뉴가 나오며 엑셀·확정만 보기는 숨긴다', async () => {
+  renderPage()
+  await startEdit()
+  expect(api.listAllVolumeWorks).toHaveBeenCalledTimes(2)
+  expect(screen.getByText('편집 중 · 바뀐 작품 0건')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '엑셀로 저장' })).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('확정만 보기')).not.toBeInTheDocument()
+  expect(within(region('1권 첫 장면')).getByRole('button', { name: '「소나기」 메뉴' })).toBeInTheDocument()
+  expect(within(region('1권 첫 장면')).queryByRole('link')).not.toBeInTheDocument() // 편집 중엔 권 보드 링크 끔
+})
+
+test('메뉴로 다른 권에 옮기면 그 권에 표시되고 편수가 바뀐다 (부는 갈래로 미리 고름)', async () => {
+  renderPage()
+  await startEdit()
+  const dlg = await openMenu('1권 첫 장면', '소나기')
+  await userEvent.selectOptions(within(dlg).getByLabelText('권'), 'v2')
+  expect(within(dlg).getByLabelText('부')).toHaveValue('q2')
+  await userEvent.click(within(dlg).getByRole('button', { name: '옮기기' }))
+  expect(within(region('2권 오래 남을')).getByText('소나기')).toBeInTheDocument()
+  expect(within(region('2권 오래 남을')).getByText('1권에서')).toBeInTheDocument()
+  expect(within(region('1권 첫 장면')).queryByText('소나기')).not.toBeInTheDocument()
+  expect(within(region('1권 첫 장면')).getByText('1편 · 현대 1 · 기획')).toBeInTheDocument()
+  expect(screen.getByText('편집 중 · 바뀐 작품 1건')).toBeInTheDocument()
+})
+
+test('같은 작품이 있는 권은 메뉴에서 고를 수 없다', async () => {
+  renderPage()
+  await startEdit()
+  const dlg = await openMenu('1권 첫 장면', '산유화')
+  expect(within(dlg).getByRole('option', { name: '2권 (이미 있음)' })).toBeDisabled()
+})
+
+test('빼면 취소선과 되돌리기가 생기고, 되돌리면 원래대로', async () => {
+  renderPage()
+  await startEdit()
+  const dlg = await openMenu('1권 첫 장면', '소나기')
+  await userEvent.click(within(dlg).getByRole('button', { name: '권에서 빼기' }))
+  expect(within(region('1권 첫 장면')).getByText('소나기').parentElement).toHaveClass('line-through')
+  expect(screen.getByText('편집 중 · 바뀐 작품 1건')).toBeInTheDocument()
+  await userEvent.click(within(region('1권 첫 장면')).getByRole('button', { name: '되돌리기' }))
+  expect(screen.getByText('편집 중 · 바뀐 작품 0건')).toBeInTheDocument()
+})
+
+test('바뀐 것이 있을 때 취소하면 확인을 묻는다', async () => {
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+  renderPage()
+  await startEdit()
+  await userEvent.click(within(await openMenu('1권 첫 장면', '소나기')).getByRole('button', { name: '권에서 빼기' }))
+  await userEvent.click(screen.getByRole('button', { name: '취소' }))
+  expect(confirm).toHaveBeenCalledWith('저장하지 않은 변경 1건이 있습니다. 나가면 사라집니다.')
+  expect(screen.getByText(/편집 중/)).toBeInTheDocument()
+  confirm.mockReturnValue(true)
+  await userEvent.click(screen.getByRole('button', { name: '취소' }))
+  expect(screen.getByRole('button', { name: '편집' })).toBeInTheDocument()
+  expect(within(region('1권 첫 장면')).getByText('소나기').parentElement).not.toHaveClass('line-through')
+  confirm.mockRestore()
+})
+
+test('저장하지 않고 다른 화면으로 가려 하면 확인을 묻는다', async () => {
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+  const router = renderPage()
+  await startEdit()
+  await userEvent.click(within(await openMenu('1권 첫 장면', '소나기')).getByRole('button', { name: '권에서 빼기' }))
+  await act(async () => { router.navigate('/') })
+  expect(confirm).toHaveBeenCalled()
+  expect(screen.getByText(/편집 중/)).toBeInTheDocument()
+  confirm.mockReturnValue(true)
+  await act(async () => { router.navigate('/') })
+  expect(await screen.findByText('홈 화면')).toBeInTheDocument()
+  confirm.mockRestore()
+})
