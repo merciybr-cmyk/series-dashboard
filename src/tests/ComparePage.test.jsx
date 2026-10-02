@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { HashRouter } from 'react-router-dom'
+import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { vi } from 'vitest'
 
 vi.mock('../board/volumeApi.js', () => ({
@@ -27,7 +27,11 @@ const VW = [
 const PARTS = [{ id: 'p1', volume_id: 'v1', number: 1, title: '시', sort_order: 10 }]
 
 function renderPage() {
-  return render(<ToastProvider><HashRouter><ComparePage /></HashRouter></ToastProvider>)
+  const router = createMemoryRouter(
+    [{ path: '/compare', element: <ComparePage /> }, { path: '/volumes/:id', element: <p>권 보드</p> }],
+    { initialEntries: ['/compare'] },
+  )
+  return render(<ToastProvider><RouterProvider router={router} /></ToastProvider>)
 }
 
 function mockData() {

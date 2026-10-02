@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { HashRouter, Routes, Route } from 'react-router-dom'
+import { createHashRouter, RouterProvider } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth/AuthProvider.jsx'
 import { ToastProvider } from './components/Toast.jsx'
 import RequireAuth from './components/RequireAuth.jsx'
@@ -24,32 +24,38 @@ function AuthCallback() {
   return <p className="p-8 text-gray-500">로그인 처리 중…</p>
 }
 
+// 2026-10-02: 권별 비교 편집 중 나가기 방지(useBlocker)에 데이터 라우터가 필요해 HashRouter에서 전환.
+// 경로·인증 감싸기·캐치올(AuthCallback) 동작은 그대로.
+
+function createAppRouter() {
+  return createHashRouter([
+    { path: '/login', element: <LoginPage /> },
+    {
+      element: (
+        <RequireAuth>
+          <AppLayout />
+        </RequireAuth>
+      ),
+      children: [
+        { path: '/', element: <HomePage /> },
+        { path: '/picks', element: <GenrePicksPage /> },
+        { path: '/volumes', element: <VolumesPage /> },
+        { path: '/volumes/:id', element: <VolumeBoardPage /> },
+        { path: '/compare', element: <ComparePage /> },
+        { path: '/auto-place', element: <AutoPlacePage /> },
+        { path: '/schedule', element: <SchedulePage /> },
+        { path: '/library', element: <LibraryPage /> },
+      ],
+    },
+    { path: '*', element: <AuthCallback /> },
+  ])
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <ToastProvider>
-        <HashRouter>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route
-              element={
-                <RequireAuth>
-                  <AppLayout />
-                </RequireAuth>
-              }
-            >
-              <Route path="/" element={<HomePage />} />
-              <Route path="/picks" element={<GenrePicksPage />} />
-              <Route path="/volumes" element={<VolumesPage />} />
-              <Route path="/volumes/:id" element={<VolumeBoardPage />} />
-              <Route path="/compare" element={<ComparePage />} />
-              <Route path="/auto-place" element={<AutoPlacePage />} />
-              <Route path="/schedule" element={<SchedulePage />} />
-              <Route path="/library" element={<LibraryPage />} />
-            </Route>
-            <Route path="*" element={<AuthCallback />} />
-          </Routes>
-        </HashRouter>
+        <RouterProvider router={createAppRouter()} />
       </ToastProvider>
     </AuthProvider>
   )
