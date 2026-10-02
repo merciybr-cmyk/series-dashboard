@@ -238,3 +238,21 @@ test('작품 데이터를 못 불러오면 패널에 오류와 다시 시도', a
   await userEvent.click(within(panel).getByRole('button', { name: '다시 시도' }))
   expect(retry).toHaveBeenCalled()
 })
+
+test('편집 중에는 작품마다 끌기 손잡이가 있고, 뺀 작품과 보기 모드에는 없다', async () => {
+  renderPage()
+  await screen.findByText('1권 첫 장면')
+  expect(screen.queryAllByRole('button', { name: /끌기$/ })).toHaveLength(0)
+  await startEdit()
+  expect(screen.getAllByRole('button', { name: /끌기$/ })).toHaveLength(4)
+  await userEvent.click(within(await openMenu('1권 첫 장면', '소나기')).getByRole('button', { name: '권에서 빼기' }))
+  expect(screen.getAllByRole('button', { name: /끌기$/ })).toHaveLength(3)
+})
+
+test('검색 패널 결과에도 끌기 손잡이가 있다', async () => {
+  renderPage()
+  await startEdit()
+  await userEvent.click(screen.getByRole('button', { name: '작품 넣기' }))
+  const panel = await screen.findByRole('complementary', { name: '작품 넣기 패널' })
+  expect(await within(panel).findByRole('button', { name: '「돌다리」 끌기' })).toBeInTheDocument()
+})

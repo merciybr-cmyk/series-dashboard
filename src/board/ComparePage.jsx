@@ -3,6 +3,7 @@
 // 2026-10-02: 작품 줄 경고, 편집 모드(옮기기·빼기·넣기를 모았다가 저장) — docs/superpowers/specs/2026-10-02-compare-edit-design.md
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useBlocker } from 'react-router-dom'
+import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import {
   listVolumes, listAllVolumeWorks, listAllParts, listAttachmentRefs,
   updateVolumeWork, deleteVolumeWork, ensureWorkId, insertPlacedWork,
@@ -13,8 +14,9 @@ import {
 } from './compareUtils.js'
 import {
   EMPTY_DRAFT, changeCount, effectiveRows, moveRow, removeRow, revertRow, addWork,
-  canPlace, placeErrorText, defaultPartFor, describeDraft,
+  canPlace, placeErrorText, defaultPartFor, describeDraft, resolveDrop, toDropActive,
 } from './compareEdit.js'
+import { DraggableWorkRow, DraggableSheetItem, DropZone } from './CompareDnd.jsx'
 import { useWorkLookup, buildDuplicatesByKey } from './useWorkLookup.js'
 import { workKeyOf } from '../works/workKey.js'
 import CompareSearchPanel from './CompareSearchPanel.jsx'
@@ -138,8 +140,12 @@ export default function ComparePage() {
   const [saveResult, setSaveResult] = useState(null)
   const [panelOpen, setPanelOpen] = useState(false)
   const [panelUsed, setPanelUsed] = useState(false)
+  const [dragging, setDragging] = useState(null)
+  const [overVolumeId, setOverVolumeId] = useState(null)
   const { show } = useToast()
   const lookup = useWorkLookup(panelUsed)
+  // 클릭(⋯·넣기 버튼)과 끌기를 구분하려고 5px 이상 움직여야 끌기 시작
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   const load = useCallback(async () => {
     const [vs, vw, ps] = await Promise.all([listVolumes(), listAllVolumeWorks(), listAllParts()])
@@ -271,6 +277,38 @@ export default function ComparePage() {
     setPanelUsed(true)
   }
 
+  function handleDragStart({ active }) {
+    setDragging(active.data.current)
+  }
+  function handleDragOver({ over }) {
+    setOverVolumeId(over?.data.current?.volumeId ?? null)
+  }
+  function handleDragEnd({ active, over }) {
+    setDragging(null)
+    setOverVolumeId(null)
+    const data = active?.data.current
+    const target = over?.data.current
+    if (!data || !target) return
+    const { draft: next, error } = resolveDrop({
+      draft, baseline, active: toDropActive(data, lookup.registryMap), over: target,
+      volumeNumberOf: id => numberById[id], newTempId,
+    })
+    if (error) show(error)
+    else setDraft(next)
+  }
+  function handleDragCancel() {
+    setDragging(null)
+    setOverVolumeId(null)
+  }
+
+  // 끄는 작품이 놓일 수 없는 권이면 그 권 테두리를 빨갛게
+  const dragRef = (() => {
+    if (!dragging) return null
+    if (dragging.type === 'sheet') return { workId: lookup.registryMap.get(dragging.key) ?? null, key: dragging.key }
+    const r = rows.find(x => x.id === dragging.rowId)
+    return r ? { workId: r.work_id, key: r._key, selfId: r.id } : null
+  })()
+
   const renderAddAction = (work, getCurricula) => {
     const key = workKeyOf(work)
     const workId = lookup.registryMap.get(key) ?? null
@@ -365,7 +403,8 @@ export default function ComparePage() {
   )
 
   return (
-    <div>
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
       {header}
       {saveResult && <SaveResult result={saveResult} onClose={() => setSaveResult(null)} />}
       <div className="flex items-start gap-4">
@@ -376,32 +415,40 @@ export default function ComparePage() {
               const name = `${v.number}권 ${v.title}`
               const meta = [`${totalOf(counts)}편`, eraSummary(counts), v.status].filter(Boolean).join(' · ')
               const hasParts = groups.some(g => g.label)
+              const invalid = !!dragRef && overVolumeId === v.id && !!blockedFor(dragRef, v.id)
               const headClass = 'block border-b border-gray-200 bg-gray-50 px-3 py-2 font-semibold'
               const head = <>{name}<span className="ml-2 text-xs font-normal text-gray-500">{meta}</span></>
               return (
-                <section key={v.id} aria-label={name} className="rounded border border-gray-200">
+                <section key={v.id} aria-label={name}
+                  className={`rounded border ${invalid ? 'border-red-400 ring-2 ring-red-300' : 'border-gray-200'}`}>
                   {editing
                     ? <div className={headClass}>{head}</div>
                     : <Link to={`/volumes/${v.id}`} className={`${headClass} hover:bg-gray-100`}>{head}</Link>}
                   <div className={`max-h-[70vh] overflow-y-auto px-2 pb-2 ${hasParts ? '' : 'pt-2'}`}>
-                    {groups.map((g, i) => (
-                      <div key={g.part ? g.part.id : `none-${i}`}>
-                        {g.label && <PartBand group={g} first={i === 0} />}
-                        <ul className="mt-1 space-y-0.5">
-                          {g.works.map(w => (
-                            <CompareWorkRow
-                              key={w.id}
-                              row={w}
-                              others={(volumesByWork.get(w.work_id) || []).filter(id => id !== v.id).map(id => numberById[id]).sort((a, b) => a - b)}
-                              warnings={warnings.get(w.id) || []}
-                              fromLabel={fromLabel(w)}
-                              trailing={editing ? rowTrailing(w) : null}
-                            />
-                          ))}
-                          {!g.works.length && <li className="py-0.5 text-xs text-gray-300">없음</li>}
-                        </ul>
-                      </div>
-                    ))}
+                    {groups.map((g, i) => {
+                      const key = g.part ? g.part.id : `none-${i}`
+                      const body = (
+                        <>
+                          {g.label && <PartBand group={g} first={i === 0} />}
+                          <ul className="mt-1 space-y-0.5">
+                            {g.works.map(w => {
+                              const others = (volumesByWork.get(w.work_id) || []).filter(id => id !== v.id).map(id => numberById[id]).sort((a, b) => a - b)
+                              const rowProps = {
+                                row: w, others, warnings: warnings.get(w.id) || [],
+                                fromLabel: fromLabel(w), trailing: editing ? rowTrailing(w) : null,
+                              }
+                              return editing && !w._removed
+                                ? <DraggableWorkRow key={w.id} {...rowProps} />
+                                : <CompareWorkRow key={w.id} {...rowProps} />
+                            })}
+                            {!g.works.length && <li className="py-0.5 text-xs text-gray-300">없음</li>}
+                          </ul>
+                        </>
+                      )
+                      return editing && (g.part || !hasParts)
+                        ? <DropZone key={key} volumeId={v.id} partId={g.part?.id ?? null}>{body}</DropZone>
+                        : <div key={key}>{body}</div>
+                    })}
                   </div>
                 </section>
               )
@@ -414,10 +461,16 @@ export default function ComparePage() {
             lookup={lookup}
             duplicatesByKey={duplicatesByKey}
             renderAction={renderAddAction}
+            itemComponent={DraggableSheetItem}
             onClose={() => setPanelOpen(false)}
           />
         )}
       </div>
+      <DragOverlay>
+        {dragging && (
+          <div className="rounded border border-blue-300 bg-white px-2 py-1 text-sm shadow-lg">{dragging.title}</div>
+        )}
+      </DragOverlay>
       {saveOpen && (
         <CompareSaveDialog
           items={describeDraft(draft, baseline, place)}
@@ -428,6 +481,6 @@ export default function ComparePage() {
           onCancel={() => setSaveOpen(false)}
         />
       )}
-    </div>
+    </DndContext>
   )
 }
