@@ -125,6 +125,8 @@ describe('describeActivity', () => {
     expect(describeActivity(move('r1', 'v7'), nameOf, ctx)).toBe('윤보라님이 「돌다리」을(를) 7권으로 옮겼습니다')
     expect(describeActivity(move('gone', 'v9'), nameOf, ctx)).toBe('윤보라님이 작품을 다른 권으로 옮겼습니다')
     expect(describeActivity(move('r1', 'v7'), nameOf)).toBe('윤보라님이 작품을 다른 권으로 옮겼습니다')
+    // 작품명을 모르더라도 권 번호를 알면 번호를 보여 준다 (설계 §3.3)
+    expect(describeActivity(move('gone', 'v7'), nameOf, ctx)).toBe('윤보라님이 작품을 7권으로 옮겼습니다')
   })
 })
 
@@ -178,7 +180,7 @@ describe('groupActivity', () => {
       vw(2, 'insert', null, '향수', '시', 7),
     ]
     expect(groupActivity(entries, nameOf, 20, ctx).map(g => g.text)).toEqual([
-      '윤보라님이 「돌다리」 외 1편을 다른 권으로 옮겼습니다',
+      '윤보라님이 「돌다리」 외 1편을 옮겼습니다',
       '윤보라님이 「풀」 외 1편을 제거했습니다',
       '윤보라님이 「향수」을(를) 추가했습니다',
     ])

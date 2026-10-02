@@ -98,7 +98,7 @@ export function describeActivity(entry, nameOf, ctx = {}) {
       const title = ctx.titleOfVw?.(entry.record_id)
       const num = ctx.volumeNumberOf?.(d.volume_id[1])
       const what = title ? `「${title}」을(를)` : '작품을'
-      return `${name} ${what} ${title && num != null ? `${num}권으로` : '다른 권으로'} 옮겼습니다`
+      return `${name} ${what} ${num != null ? `${num}권으로` : '다른 권으로'} 옮겼습니다`
     }
     if (a === 'update' && d.selection_status) {
       return `${name} 선정 상태를 '${SELECTION_LABELS[d.selection_status[1]] || d.selection_status[1]}'(으)로 변경했습니다`
@@ -156,7 +156,7 @@ function manualKindOf(entry) {
   if (entry.action === 'update' && entry.diff?.volume_id) return 'move'
   return null
 }
-const KIND_VERB = { add: '추가했습니다', remove: '제거했습니다', move: '다른 권으로 옮겼습니다' }
+const KIND_VERB = { add: '추가했습니다', remove: '제거했습니다', move: '옮겼습니다' }
 
 export function groupActivity(entries, nameOf, limit = 20, ctx = {}) {
   const groups = []
