@@ -4,9 +4,9 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { vi } from 'vitest'
 
 vi.mock('../board/volumeApi.js', () => ({
-  listVolumes: vi.fn(),
-  listAllVolumeWorks: vi.fn(),
-  listAllParts: vi.fn(),
+  listVolumes: vi.fn(), listAllVolumeWorks: vi.fn(), listAllParts: vi.fn(),
+  listAttachmentRefs: vi.fn(), updateVolumeWork: vi.fn(), deleteVolumeWork: vi.fn(),
+  ensureWorkId: vi.fn(), insertPlacedWork: vi.fn(), listRegistry: vi.fn(), listPicks: vi.fn(),
 }))
 vi.mock('../board/exportCompare.js', () => ({ downloadCompareExcel: vi.fn() }))
 const api = await import('../board/volumeApi.js')
@@ -48,7 +48,7 @@ test('권별 카드에 부 그룹·작품·중복 강조를 표시한다', async
   const v1 = screen.getByRole('region', { name: '1권 삶' })
   expect(within(v1).getByText('1부 시')).toBeInTheDocument()
   expect(screen.getAllByText('소나기')).toHaveLength(2)      // 두 권 모두
-  expect(screen.getAllByText(/⚠/)).toHaveLength(2)          // 겹침 강조 2곳
+  expect(screen.getAllByText(/^⚠ [\d·]+권$/)).toHaveLength(2)   // 겹침 강조 2곳 (부 확인 경고와 구분)
   expect(screen.getByText('산유화')).toBeInTheDocument()
 })
 
