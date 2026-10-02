@@ -163,6 +163,13 @@ describe('순서 바꾸기', () => {
     expect(moveInGroup(EMPTY_DRAFT, B, 'a', -1)).toBe(EMPTY_DRAFT)
   })
 
+  test('moveInGroup: 순서 번호가 겹친 묶음(a=10, b=10)도 위로 옮기면 순서가 바뀐다', () => {
+    const T = [R('a', 'p2', 10, '소설'), R('b', 'p2', 10, '소설')]
+    const d = moveInGroup(EMPTY_DRAFT, T, 'b', -1)
+    expect(changeCount(d)).toBe(1)
+    expect(groupOrder(effectiveRows(T, d), K)).toEqual(['b', 'a'])
+  })
+
   test('revertGroupOrder: 그 묶음 순서를 편집 시작 때로', () => {
     expect(changeCount(revertGroupOrder(moveInGroup(EMPTY_DRAFT, B, 'b', -1), K))).toBe(0)
   })

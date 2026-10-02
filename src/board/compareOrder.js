@@ -40,6 +40,7 @@ export function desiredOrders(rows, orders = {}) {
 
 // rows: 살아 있는 행. home = 지금 번호가 지금 권의 유효한 자리(편집 전부터 이 묶음에 있던 행).
 // freshStart(volumeId): 그 권의 첫 새 번호. 새 번호는 home 아닌 행이 처음 나타나는 묶음부터, 묶음 안에서는 원하는 순서대로 10씩.
+// 묶음의 home 번호가 서로 겹치면(같은 번호 두 행) 그 묶음은 구성원 모두 새 번호를 받는다 — 겹친 번호로는 순서를 가릴 수 없다.
 export function assignSortOrders(rows, { orders = {}, freshStart }) {
   const byId = new Map(rows.map(r => [r.id, r]))
   const desired = desiredOrders(rows, orders)
@@ -49,7 +50,7 @@ export function assignSortOrders(rows, { orders = {}, freshStart }) {
     const k = groupKeyOfRow(r)
     if (!firstAway.has(k)) firstAway.set(k, i)
   })
-  const keys = [...desired.keys()].sort((a, b) => (firstAway.get(a) ?? Infinity) - (firstAway.get(b) ?? Infinity))
+  const keys = [...desired.keys()].sort((a, b) => (firstAway.get(a) ?? Number.MAX_SAFE_INTEGER) - (firstAway.get(b) ?? Number.MAX_SAFE_INTEGER))
 
   const nextFresh = new Map()
   const takeFresh = volumeId => {
@@ -63,8 +64,11 @@ export function assignSortOrders(rows, { orders = {}, freshStart }) {
   for (const k of keys) {
     const ids = desired.get(k)
     const members = ids.map(id => byId.get(id))
-    const slots = members.filter(r => r.home).map(r => r.sort_order).sort((a, b) => a - b)
-    for (const r of members) if (!r.home) slots.push(takeFresh(r.volume_id))
+    const homeNums = members.filter(r => r.home).map(r => r.sort_order).sort((a, b) => a - b)
+    // 쓰던 번호가 겹친 묶음은 번호만 나눠서는 순서를 바꿀 수 없다 — 구성원 모두 새 번호를 받아 스스로 고친다
+    const tied = new Set(homeNums).size !== homeNums.length
+    const slots = tied ? members.map(r => takeFresh(r.volume_id)) : homeNums
+    if (!tied) for (const r of members) if (!r.home) slots.push(takeFresh(r.volume_id))
     ids.forEach((id, i) => result.set(id, slots[i]))
   }
   return result

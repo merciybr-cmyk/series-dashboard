@@ -50,4 +50,42 @@ describe('assignSortOrders', () => {
     const out = assignSortOrders(rows, { orders: { 'v1|p1|현대': ['b', 'gone', 'a'] }, freshStart: () => 100 })
     expect(Object.fromEntries(out)).toEqual({ b: 10, a: 20, n: 30 })
   })
+
+  test('순서 번호가 겹친 묶음(a=10, b=10)도 새 순서대로 서로 다른 새 번호로 고친다', () => {
+    const rows = [r('a', 'v1', 'p1', 10, '시'), r('b', 'v1', 'p1', 10, '시')]
+    const out = assignSortOrders(rows, { orders: { 'v1|p1|현대': ['b', 'a'] }, freshStart: () => 100 })
+    expect(Object.fromEntries(out)).toEqual({ b: 100, a: 110 })
+  })
+
+  test('번호가 겹친 묶음에 옮겨 온 행이 있으면 모든 구성원이 원하는 순서대로 이어서 새 번호를 받는다', () => {
+    const rows = [r('a', 'v1', 'p1', 10, '시'), r('b', 'v1', 'p1', 10, '시'), r('x', 'v1', 'p1', null, '시', false)]
+    const out = assignSortOrders(rows, { orders: { 'v1|p1|현대': ['x', 'b', 'a'] }, freshStart: () => 100 })
+    expect(Object.fromEntries(out)).toEqual({ x: 100, b: 110, a: 120 })
+  })
+
+  test('번호가 겹치지 않은 묶음은 자기 번호를 그대로 쓴다 (겹친 묶음 옆에서도)', () => {
+    const rows = [
+      r('a', 'v1', 'p1', 10, '시'), r('b', 'v1', 'p1', 10, '시'),
+      r('c', 'v1', 'p2', 20, '시'), r('d', 'v1', 'p2', 30, '시'),
+    ]
+    const out = assignSortOrders(rows, { orders: { 'v1|p1|현대': ['b', 'a'], 'v1|p2|현대': ['d', 'c'] }, freshStart: () => 100 })
+    expect(Object.fromEntries(out)).toEqual({ b: 100, a: 110, d: 20, c: 30 })
+  })
+
+  test('옮겨 온 행이 둘이면 묶음 안에서 원하는 순서대로 이어서 새 번호를 받는다', () => {
+    const rows = [
+      r('a', 'v1', 'p1', 10, '시'), r('b', 'v1', 'p1', 20, '시'),
+      r('x', 'v1', 'p1', null, '시', false), r('y', 'v1', 'p1', null, '시', false),
+    ]
+    const out = assignSortOrders(rows, { orders: { 'v1|p1|현대': ['y', 'a', 'x', 'b'] }, freshStart: () => 50 })
+    // 쓰던 번호 10·20과 새 번호 50·60을 모아 원하는 순서대로 나눈다
+    expect(Object.fromEntries(out)).toEqual({ y: 10, a: 20, x: 50, b: 60 })
+  })
+
+  test('옮겨 온 행이 처음 나타나는 묶음부터 새 번호를 받는다 (입력 순서의 첫 묶음이 아니어도)', () => {
+    const rows = [r('a', 'v1', 'p1', 10, '시'), r('y', 'v1', 'p2', null, '시', false), r('x', 'v1', 'p1', null, '시', false)]
+    const out = assignSortOrders(rows, { orders: {}, freshStart: () => 50 })
+    expect(Object.fromEntries(out)).toEqual({ a: 10, y: 50, x: 60 })
+  })
+
 })
