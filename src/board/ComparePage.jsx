@@ -16,7 +16,7 @@ import {
   EMPTY_DRAFT, changeCount, effectiveRows, moveRow, removeRow, revertRow, addWork,
   canPlace, placeErrorText, defaultPartFor, describeDraft, resolveDrop, toDropActive,
 } from './compareEdit.js'
-import { DraggableWorkRow, DraggableSheetItem, DropZone } from './CompareDnd.jsx'
+import { DraggableWorkRow, DraggableSheetItem, DropZone, visiblePointerWithin } from './CompareDnd.jsx'
 import { useWorkLookup, buildDuplicatesByKey } from './useWorkLookup.js'
 import { workKeyOf } from '../works/workKey.js'
 import CompareSearchPanel from './CompareSearchPanel.jsx'
@@ -414,7 +414,7 @@ export default function ComparePage() {
   )
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver}
+    <DndContext sensors={sensors} collisionDetection={visiblePointerWithin} onDragStart={handleDragStart} onDragOver={handleDragOver}
       onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
       {header}
       {saveResult && <SaveResult result={saveResult} onClose={() => setSaveResult(null)} />}
@@ -435,7 +435,7 @@ export default function ComparePage() {
                   {editing
                     ? <div className={headClass}>{head}</div>
                     : <Link to={`/volumes/${v.id}`} className={`${headClass} hover:bg-gray-100`}>{head}</Link>}
-                  <div className={`max-h-[70vh] overflow-y-auto px-2 pb-2 ${hasParts ? '' : 'pt-2'}`}>
+                  <div data-drop-clip className={`max-h-[70vh] overflow-y-auto px-2 pb-2 ${hasParts ? '' : 'pt-2'}`}>
                     {groups.map((g, i) => {
                       const key = g.part ? g.part.id : `none-${i}`
                       const body = (
