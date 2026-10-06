@@ -136,6 +136,7 @@ export async function runSave(plan, api, { registryMap }) {
     }
   }
 
+  const failedMoves = new Set() // 옮기지 못한 작품은 상태도 두고 간다 (계획 때 건너뛴 것과 같은 규칙)
   let pending = plan.moves
   for (let pass = 0; pass < 2 && pending.length; pass++) {
     const retry = []
@@ -148,7 +149,10 @@ export async function runSave(plan, api, { registryMap }) {
         result.moved++
       } catch (err) {
         if (pass === 0 && isDuplicate(err)) retry.push(m) // 다른 옮기기가 자리를 비운 뒤 다시
-        else result.failed.push({ title: m.title, reason: isDuplicate(err) ? '옮길 권에 같은 작품이 있습니다' : err.message })
+        else {
+          failedMoves.add(m.id)
+          result.failed.push({ title: m.title, reason: isDuplicate(err) ? '옮길 권에 같은 작품이 있습니다' : err.message })
+        }
       }
     }
     pending = retry
@@ -183,6 +187,10 @@ export async function runSave(plan, api, { registryMap }) {
   }
 
   for (const st of plan.statuses || []) {
+    if (failedMoves.has(st.id)) {
+      result.skipped.push({ title: st.title, reason: MOVE_SKIPPED })
+      continue
+    }
     try {
       await api.updateVolumeWork(st.id, { selection_status: st.status })
       result.statusChanged++

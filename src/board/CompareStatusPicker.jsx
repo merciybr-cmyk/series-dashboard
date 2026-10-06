@@ -20,11 +20,17 @@ export default function CompareStatusPicker({ title, status, original = null, on
     const onDown = e => {
       if (!boxRef.current?.contains(e.target) && !btnRef.current?.contains(e.target)) setOpen(false)
     }
-    const onKey = e => { if (e.key === 'Escape') setOpen(false) }
+    const onKey = e => {
+      if (e.key !== 'Escape') return
+      setOpen(false)
+      btnRef.current?.focus()
+    }
     const onScroll = e => { if (!boxRef.current?.contains(e.target)) setOpen(false) }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     window.addEventListener('scroll', onScroll, true)
+    // 열면 지금 상태 단추로 — 스크롤하면 닫히므로 포커스가 화면을 움직이지 않게
+    boxRef.current?.querySelector('[aria-pressed="true"]')?.focus({ preventScroll: true })
     return () => {
       document.removeEventListener('mousedown', onDown)
       document.removeEventListener('keydown', onKey)
@@ -43,11 +49,13 @@ export default function CompareStatusPicker({ title, status, original = null, on
   function pick(s) {
     onPick(s)
     setOpen(false)
+    btnRef.current?.focus()
   }
 
   return (
     <>
-      <button ref={btnRef} type="button" aria-label={`「${title}」 상태`} onClick={toggle}
+      <button ref={btnRef} type="button" aria-label={`「${title}」 상태: ${SELECTION_LABELS[status]}`}
+        aria-haspopup="dialog" aria-expanded={open} onClick={toggle}
         title={original ? `원래 ${SELECTION_LABELS[original]}` : undefined}
         className={`shrink-0 rounded px-1 py-0.5 text-xs ${SELECTION_BADGE[status]} ${original ? 'ring-2 ring-blue-400' : 'hover:ring-1 hover:ring-gray-300'}`}>
         {SELECTION_LABELS[status]}<span aria-hidden="true" className="ml-0.5 opacity-60">▾</span>

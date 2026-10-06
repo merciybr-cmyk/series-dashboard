@@ -412,8 +412,9 @@ export default function ComparePage() {
     )
   }
 
+  // 뺀 줄과 제외 작품은 고를 수 없다 — 제외는 고를 수 있는 상태가 아니라서 고르면 되돌릴 길이 없다
   function statusControl(row) {
-    if (row._removed) return null
+    if (row._removed || (row._statusFrom ?? row.selection_status) === 'excluded') return null
     return (
       <CompareStatusPicker
         title={row.work_snapshot?.title}

@@ -121,7 +121,12 @@ export function revertRow(draft, rowId, baseline = null) {
 // 선정 상태 고르기 (compare-status). 원래 상태로 고르면 바뀐 것에서 뺀다. 넣는 작품은 넣기 항목에 단다. 뺀 행은 그대로
 export function setStatus(draft, baseline, rowId, status) {
   if (isAdd(draft, rowId)) {
-    return { ...draft, adds: draft.adds.map(a => (a.tempId === rowId ? { ...a, status } : a)) }
+    // 후보면 상태를 달지 않는다 — 넣을 때 DB 기본값(후보)을 쓴다
+    const withStatus = a => {
+      const { status: _drop, ...rest } = a
+      return status === 'candidate' ? rest : { ...rest, status }
+    }
+    return { ...draft, adds: draft.adds.map(a => (a.tempId === rowId ? withStatus(a) : a)) }
   }
   const base = baseline.find(r => r.id === rowId)
   if (!base || draft.removes[rowId]) return draft

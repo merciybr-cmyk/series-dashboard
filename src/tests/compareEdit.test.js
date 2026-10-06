@@ -292,6 +292,11 @@ describe('상태 바꾸기', () => {
     expect(effectiveRows(BASE, d).find(r => r.id === 'n1')).toMatchObject({ selection_status: 'confirmed', _added: true })
   })
 
+  test('새로 넣은 작품을 다시 후보로 고르면 상태를 따로 달지 않는다 (DB 기본값)', () => {
+    const d = setStatus(setStatus(addWork(EMPTY_DRAFT, ADD), BASE, 'n1', 'confirmed'), BASE, 'n1', 'candidate')
+    expect('status' in d.adds[0]).toBe(false)
+  })
+
   test('없는 행이나 뺀 행은 그대로', () => {
     expect(setStatus(EMPTY_DRAFT, BASE, 'zz', 'confirmed')).toBe(EMPTY_DRAFT)
     const removed = removeRow(EMPTY_DRAFT, 'a')

@@ -361,19 +361,22 @@ test('부가 있는 권의 미배정 줄은 끌 수는 있어도 놓을 곳이 �
 test('상태: 보기 모드에선 누를 수 없고, 편집 중엔 상태 표시를 눌러 후보·보류·확정 중에 고른다', async () => {
   renderPage()
   await screen.findByText('2권 오래 남을')
-  expect(screen.queryByRole('button', { name: '「소나기」 상태' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /^「소나기」 상태/ })).not.toBeInTheDocument()
   await startEdit()
 
-  const trigger = within(region('1권 첫 장면')).getByRole('button', { name: '「소나기」 상태' })
-  expect(trigger).toHaveTextContent('후보')
+  const trigger = within(region('1권 첫 장면')).getByRole('button', { name: '「소나기」 상태: 후보' })
+  expect(trigger).toHaveAttribute('aria-expanded', 'false')
   await userEvent.click(trigger)
+  expect(trigger).toHaveAttribute('aria-expanded', 'true')
   const picker = screen.getByRole('dialog', { name: '「소나기」 상태 고르기' })
+  expect(within(picker).getByRole('button', { name: '후보' })).toHaveFocus()
   expect(within(picker).getAllByRole('button').map(b => b.textContent)).toEqual(['후보', '보류', '확정'])
   expect(within(picker).getByRole('button', { name: '후보' })).toHaveAttribute('aria-pressed', 'true')
   await userEvent.click(within(picker).getByRole('button', { name: '확정' }))
 
   expect(screen.queryByRole('dialog', { name: '「소나기」 상태 고르기' })).not.toBeInTheDocument()
-  expect(trigger).toHaveTextContent('확정')
+  expect(trigger).toHaveAccessibleName('「소나기」 상태: 확정')
+  expect(trigger).toHaveFocus()
   expect(trigger).toHaveAttribute('title', '원래 후보')
   expect(screen.getByText('편집 중 · 바뀐 작품 1건')).toBeInTheDocument()
 
@@ -387,7 +390,7 @@ test('상태: 메뉴의 되돌리기로 원래 상태로, 저장하면 확인 �
   renderPage()
   await startEdit()
   const pick = async (regionName, title, label) => {
-    await userEvent.click(within(region(regionName)).getByRole('button', { name: `「${title}」 상태` }))
+    await userEvent.click(within(region(regionName)).getByRole('button', { name: new RegExp(`^「${title}」 상태`) }))
     await userEvent.click(within(screen.getByRole('dialog', { name: `「${title}」 상태 고르기` })).getByRole('button', { name: label }))
   }
   await pick('1권 첫 장면', '소나기', '보류')
@@ -418,13 +421,13 @@ test('상태: 새로 넣은 작품에 확정을 고르면 확인 창에 표시�
   const dlg = screen.getByRole('dialog', { name: '「돌다리」 넣기' })
   await userEvent.selectOptions(within(dlg).getByLabelText('권'), 'v2')
   await userEvent.click(within(dlg).getByRole('button', { name: '넣기' }))
-  await userEvent.click(within(region('2권 오래 남을')).getByRole('button', { name: '「돌다리」 상태' }))
+  await userEvent.click(within(region('2권 오래 남을')).getByRole('button', { name: '「돌다리」 상태: 후보' }))
   await userEvent.click(within(screen.getByRole('dialog', { name: '「돌다리」 상태 고르기' })).getByRole('button', { name: '확정' }))
   expect(screen.getByText('편집 중 · 바뀐 작품 1건')).toBeInTheDocument()
 
   const menu = await openMenu('1권 첫 장면', '소나기')
   await userEvent.click(within(menu).getByRole('button', { name: '권에서 빼기' }))
-  expect(within(region('1권 첫 장면')).queryByRole('button', { name: '「소나기」 상태' })).not.toBeInTheDocument()
+  expect(within(region('1권 첫 장면')).queryByRole('button', { name: /^「소나기」 상태/ })).not.toBeInTheDocument()
 
   await userEvent.click(screen.getByRole('button', { name: '저장' }))
   const confirmBox = await screen.findByRole('dialog', { name: '저장 확인' })
@@ -432,4 +435,23 @@ test('상태: 새로 넣은 작품에 확정을 고르면 확인 창에 표시�
   await clickSaveIn(confirmBox)
   await screen.findByText('반영했습니다: 옮기기 0 · 넣기 1 · 빼기 1 · 순서 0 · 상태 0')
   expect(api.insertPlacedWork).toHaveBeenCalledWith(expect.objectContaining({ workId: 'W9', selectionStatus: 'confirmed' }))
+})
+
+test('상태: 제외 작품은 상태를 고를 수 없고, 상자는 Esc나 바깥을 누르면 닫힌다', async () => {
+  const X = { id: 'x', volume_id: 'v1', work_id: 'W7', part_id: 'p2', sort_order: 40, selection_status: 'excluded', work_snapshot: snap('날개', '이상', '소설', ['2차']) }
+  api.listAllVolumeWorks.mockResolvedValue([...VW, X])
+  renderPage()
+  await startEdit()
+  expect(within(region('1권 첫 장면')).queryByRole('button', { name: /^「날개」 상태/ })).not.toBeInTheDocument()
+  expect(within(region('1권 첫 장면')).getByText('제외')).toBeInTheDocument()
+
+  const trigger = within(region('1권 첫 장면')).getByRole('button', { name: '「소나기」 상태: 후보' })
+  await userEvent.click(trigger)
+  await userEvent.keyboard('{Escape}')
+  expect(screen.queryByRole('dialog', { name: '「소나기」 상태 고르기' })).not.toBeInTheDocument()
+  expect(trigger).toHaveFocus()
+
+  await userEvent.click(trigger)
+  await userEvent.click(screen.getByText('편집 중 · 바뀐 작품 0건'))
+  expect(screen.queryByRole('dialog', { name: '「소나기」 상태 고르기' })).not.toBeInTheDocument()
 })

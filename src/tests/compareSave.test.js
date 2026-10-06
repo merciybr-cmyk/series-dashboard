@@ -289,6 +289,24 @@ describe('상태 바꾸기 저장', () => {
     expect(result.failed).toEqual([{ title: 'B', reason: 'network down' }])
   })
 
+  test('runSave: 옮기기가 실패한 작품은 상태도 바꾸지 않고 건너뛴다', async () => {
+    const api = {
+      deleteVolumeWork: vi.fn(), ensureWorkId: vi.fn(), insertPlacedWork: vi.fn(),
+      updateVolumeWork: vi.fn(async id => { if (id === 'a') throw new Error('network down'); return {} }),
+    }
+    const p = {
+      removes: [], adds: [], reorders: [], skipped: [], alreadyRemoved: 0,
+      moves: [{ id: 'a', title: 'A', volumeId: 'v2', partId: 'q2', sortOrder: 40 }],
+      statuses: [{ id: 'a', title: 'A', status: 'confirmed' }, { id: 'b', title: 'B', status: 'hold' }],
+    }
+    const result = await runSave(p, api, { registryMap: new Map() })
+    expect(api.updateVolumeWork).not.toHaveBeenCalledWith('a', { selection_status: 'confirmed' })
+    expect(api.updateVolumeWork).toHaveBeenCalledWith('b', { selection_status: 'hold' })
+    expect(result.statusChanged).toBe(1)
+    expect(result.failed).toEqual([{ title: 'A', reason: 'network down' }])
+    expect(result.skipped).toEqual([{ title: 'A', reason: '옮기지 못해 상태도 그대로 두었습니다' }])
+  })
+
   test('runSave: 상태를 고른 넣기는 그 상태로 넣는다', async () => {
     const api = {
       deleteVolumeWork: vi.fn(), ensureWorkId: vi.fn(), updateVolumeWork: vi.fn(),
