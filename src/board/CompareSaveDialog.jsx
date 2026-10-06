@@ -4,22 +4,25 @@ import { attachmentText } from './compareSave.js'
 
 function lineOf(i) {
   if (i.kind === 'move') return `〈${i.title}〉 ${i.from} → ${i.to}`
-  if (i.kind === 'add') return `〈${i.title}〉 → ${i.to} (새로)`
+  if (i.kind === 'add') return `〈${i.title}〉 → ${i.to} (새로${i.status ? ` · ${i.status}` : ''})`
   if (i.kind === 'order') return `${i.to} — 순서 변경`
+  if (i.kind === 'status') return `〈${i.title}〉 ${i.place} — ${i.from} → ${i.to}`
   return `〈${i.title}〉 ${i.from}에서 빼기`
 }
 
 export default function CompareSaveDialog({ items, attachments, warnings, saving, onConfirm, onCancel }) {
   const count = kind => items.filter(i => i.kind === kind).length
+  // 옮기면서 상태도 바꾼 작품은 경고를 옮기기 줄에만 단다
+  const movedIds = new Set(items.filter(i => i.kind === 'move').map(i => i.rowId))
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
       <div role="dialog" aria-modal="true" aria-label="저장 확인"
         className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded bg-white p-4 shadow-xl">
         <h3 className="mb-1 font-bold">저장할까요?</h3>
-        <p className="mb-3 text-sm text-gray-600">옮기기 {count('move')} · 넣기 {count('add')} · 빼기 {count('remove')} · 순서 {count('order')}</p>
+        <p className="mb-3 text-sm text-gray-600">옮기기 {count('move')} · 넣기 {count('add')} · 빼기 {count('remove')} · 순서 {count('order')} · 상태 {count('status')}</p>
         <ul className="mb-4 space-y-1 text-sm">
           {items.map(i => {
-            const w = warnings.get(i.rowId) || []
+            const w = i.kind === 'status' && movedIds.has(i.rowId) ? [] : warnings.get(i.rowId) || []
             const att = i.kind === 'remove' ? attachmentText(attachments?.get(i.rowId)) : ''
             return (
               <li key={`${i.kind}-${i.rowId}`}>

@@ -1,7 +1,7 @@
 import {
   EMPTY_DRAFT, changeCount, effectiveRows, moveRow, removeRow, revertRow, addWork,
   canPlace, placeErrorText, defaultPartFor, resolveDrop, toDropActive, describeDraft,
-  groupOrder, placeInGroup, moveInGroup, revertGroupOrder, resolveAnchor,
+  groupOrder, placeInGroup, moveInGroup, revertGroupOrder, resolveAnchor, setStatus,
 } from '../board/compareEdit.js'
 
 const row = (id, volume_id, work_id, part_id, extra = {}) => ({
@@ -245,5 +245,74 @@ describe('순서 바꾸기', () => {
     const work = { '작품명': '돌다리', '지은이': '이태준', '장르': '소설', _authorBase: '이태준' }
     const { draft } = drop({ type: 'sheet', key: 'k', workId: 'W9', curricula: [], work }, { volumeId: 'v1', partId: 'p2', anchorId: 'a', position: 'before' })
     expect(order(draft)).toEqual(['n1', 'a', 'b', 'c'])
+  })
+})
+
+describe('상태 바꾸기', () => {
+  const ADD = { tempId: 'n1', workId: 'W9', key: 'k1', work: SHEET, curricula: [], volumeId: 'v2', partId: 'q2' }
+
+  test('상태를 바꾸면 화면 행의 상태가 바뀌고 원래 상태를 기억하며 1건', () => {
+    const d = setStatus(EMPTY_DRAFT, BASE, 'a', 'confirmed')
+    expect(changeCount(d)).toBe(1)
+    expect(effectiveRows(BASE, d).find(r => r.id === 'a'))
+      .toMatchObject({ selection_status: 'confirmed', _statusFrom: 'candidate' })
+  })
+
+  test('원래 상태로 다시 고르면 바뀐 것이 아니다', () => {
+    const d = setStatus(setStatus(EMPTY_DRAFT, BASE, 'a', 'hold'), BASE, 'a', 'candidate')
+    expect(changeCount(d)).toBe(0)
+    expect(effectiveRows(BASE, d).find(r => r.id === 'a')._statusFrom).toBeUndefined()
+  })
+
+  test('옮기고 상태도 바꾼 작품은 1건으로 센다', () => {
+    const d = setStatus(moveRow(EMPTY_DRAFT, BASE, 'a', 'v2', 'q2'), BASE, 'a', 'confirmed')
+    expect(changeCount(d)).toBe(1)
+    expect(effectiveRows(BASE, d).find(r => r.id === 'a'))
+      .toMatchObject({ volume_id: 'v2', selection_status: 'confirmed', _statusFrom: 'candidate' })
+  })
+
+  test('상태를 바꾼 작품을 빼면 상태 변경은 없어지고 빼기만 남는다', () => {
+    const d = removeRow(setStatus(EMPTY_DRAFT, BASE, 'a', 'confirmed'), 'a', BASE)
+    expect(d.statuses).toEqual({})
+    expect(changeCount(d)).toBe(1)
+    expect(effectiveRows(BASE, d).find(r => r.id === 'a')).toMatchObject({ _removed: true, selection_status: 'candidate' })
+  })
+
+  test('되돌리기는 자리와 상태를 함께 원래대로', () => {
+    let d = setStatus(moveRow(EMPTY_DRAFT, BASE, 'a', 'v2', 'q2'), BASE, 'a', 'confirmed')
+    d = revertRow(d, 'a', BASE)
+    expect(changeCount(d)).toBe(0)
+    expect(effectiveRows(BASE, d).find(r => r.id === 'a')).toMatchObject({ volume_id: 'v1', selection_status: 'candidate' })
+  })
+
+  test('새로 넣은 작품의 상태를 바꿔도 넣기 1건 그대로', () => {
+    const d = setStatus(addWork(EMPTY_DRAFT, ADD), BASE, 'n1', 'confirmed')
+    expect(changeCount(d)).toBe(1)
+    expect(d.adds[0].status).toBe('confirmed')
+    expect(effectiveRows(BASE, d).find(r => r.id === 'n1')).toMatchObject({ selection_status: 'confirmed', _added: true })
+  })
+
+  test('새로 넣은 작품을 다시 후보로 고르면 상태를 따로 달지 않는다 (DB 기본값)', () => {
+    const d = setStatus(setStatus(addWork(EMPTY_DRAFT, ADD), BASE, 'n1', 'confirmed'), BASE, 'n1', 'candidate')
+    expect('status' in d.adds[0]).toBe(false)
+  })
+
+  test('없는 행이나 뺀 행은 그대로', () => {
+    expect(setStatus(EMPTY_DRAFT, BASE, 'zz', 'confirmed')).toBe(EMPTY_DRAFT)
+    const removed = removeRow(EMPTY_DRAFT, 'a')
+    expect(setStatus(removed, BASE, 'a', 'confirmed')).toBe(removed)
+  })
+
+  test('describeDraft: 상태 항목은 지금 자리와 원래 → 새 상태, 넣는 작품은 후보가 아닐 때만 상태를 단다', () => {
+    let d = setStatus(moveRow(EMPTY_DRAFT, BASE, 'a', 'v2', 'q2'), BASE, 'a', 'confirmed')
+    d = setStatus(d, BASE, 'b', 'hold')
+    d = setStatus(addWork(d, ADD), BASE, 'n1', 'confirmed')
+    const place = (v, p) => `${v}/${p}`
+    expect(describeDraft(d, BASE, place)).toEqual([
+      { kind: 'move', rowId: 'a', title: '작품a', from: 'v1/p1', to: 'v2/q2' },
+      { kind: 'add', rowId: 'n1', title: '돌다리', to: 'v2/q2', status: '확정' },
+      { kind: 'status', rowId: 'a', title: '작품a', place: 'v2/q2', from: '후보', to: '확정' },
+      { kind: 'status', rowId: 'b', title: '작품b', place: 'v1/p2', from: '후보', to: '보류' },
+    ])
   })
 })

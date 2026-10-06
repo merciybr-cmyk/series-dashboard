@@ -1,6 +1,6 @@
 import { vi } from 'vitest'
 import { planSave, runSave, countAttachments, attachmentText, resultSummary } from '../board/compareSave.js'
-import { EMPTY_DRAFT, moveRow, removeRow, addWork, moveInGroup, placeInGroup } from '../board/compareEdit.js'
+import { EMPTY_DRAFT, moveRow, removeRow, addWork, moveInGroup, placeInGroup, setStatus } from '../board/compareEdit.js'
 
 const row = (id, volume_id, work_id, part_id, sort_order = 10) => ({
   id, volume_id, work_id, part_id, sort_order, selection_status: 'candidate', work_snapshot: { title: `작품${id}` },
@@ -114,7 +114,7 @@ describe('runSave', () => {
     expect(api.insertPlacedWork).toHaveBeenCalledWith({
       volumeId: 'v2', workId: 'W100', workSnapshot: { title: '돌다리' }, partId: 'q2', batchId: null, sortOrder: 50,
     })
-    expect(result).toEqual({ removed: 2, moved: 1, added: 1, reordered: 0, skipped: [], failed: [] })
+    expect(result).toEqual({ removed: 2, moved: 1, added: 1, reordered: 0, statusChanged: 0, skipped: [], failed: [] })
   })
 
   test('같은 작품 충돌로 실패한 옮기기는 한 번 더 시도하고, 다른 실패는 목록에 남기고 계속한다', async () => {
@@ -159,8 +159,8 @@ test('countAttachments·attachmentText: 빼는 작품에 딸린 것 안내', () 
 })
 
 test('resultSummary', () => {
-  expect(resultSummary({ moved: 7, added: 3, removed: 2 })).toBe('반영했습니다: 옮기기 7 · 넣기 3 · 빼기 2 · 순서 0')
-  expect(resultSummary({ moved: 0, added: 0, removed: 0, reordered: 2 })).toBe('반영했습니다: 옮기기 0 · 넣기 0 · 빼기 0 · 순서 2')
+  expect(resultSummary({ moved: 7, added: 3, removed: 2 })).toBe('반영했습니다: 옮기기 7 · 넣기 3 · 빼기 2 · 순서 0 · 상태 0')
+  expect(resultSummary({ moved: 0, added: 0, removed: 0, reordered: 2, statusChanged: 4 })).toBe('반영했습니다: 옮기기 0 · 넣기 0 · 빼기 0 · 순서 2 · 상태 4')
 })
 
 describe('순서 바꾸기 저장', () => {
@@ -225,5 +225,100 @@ describe('순서 바꾸기 저장', () => {
     const result = await runSave(plan, api, { registryMap: new Map() })
     expect(result.reordered).toBe(0)
     expect(result.failed).toEqual([{ title: 'B', reason: 'network down' }])
+  })
+})
+
+describe('상태 바꾸기 저장', () => {
+  const plan = (draft, latestRows = BASE) => planSave({ draft, baseline: BASE, latestRows, latestParts: PARTS })
+
+  test('그사이 바뀐 것이 없으면 상태를 바꾼다', () => {
+    const p = plan(setStatus(EMPTY_DRAFT, BASE, 'a', 'confirmed'))
+    expect(p.statuses).toEqual([{ id: 'a', title: '작품a', status: 'confirmed' }])
+    expect(p.skipped).toEqual([])
+  })
+
+  test('그사이 다른 분이 상태를 바꿨거나, 옮기거나 뺀 작품은 건너뛴다', () => {
+    let d = setStatus(EMPTY_DRAFT, BASE, 'a', 'confirmed')
+    d = setStatus(d, BASE, 'b', 'confirmed')
+    d = setStatus(d, BASE, 'c', 'hold')
+    const latest = [{ ...BASE[0], selection_status: 'hold' }, { ...BASE[1], volume_id: 'v2', part_id: 'q1' }] // c는 지워짐
+    const p = plan(d, latest)
+    expect(p.statuses).toEqual([])
+    expect(p.skipped).toEqual([
+      { title: '작품a', reason: '그사이 다른 분이 상태를 바꿨습니다' },
+      { title: '작품b', reason: '그사이 다른 분이 옮기거나 뺐습니다' },
+      { title: '작품c', reason: '그사이 다른 분이 옮기거나 뺐습니다' },
+    ])
+  })
+
+  test('함께 옮기려던 것이 건너뛰어지면 상태도 바꾸지 않는다', () => {
+    const d = setStatus(moveRow(EMPTY_DRAFT, BASE, 'a', 'v2', 'q2'), BASE, 'a', 'confirmed')
+    const p = plan(d, [...BASE, row('z', 'v2', 'W1', 'q1')])
+    expect(p.moves).toEqual([])
+    expect(p.statuses).toEqual([])
+    expect(p.skipped).toEqual([
+      { title: '작품a', reason: '그사이 같은 작품이 들어왔습니다' },
+      { title: '작품a', reason: '옮기지 못해 상태도 그대로 두었습니다' },
+    ])
+  })
+
+  test('옮기기와 상태를 함께 바꾸면 둘 다 계획에 들어간다', () => {
+    const p = plan(setStatus(moveRow(EMPTY_DRAFT, BASE, 'a', 'v2', 'q2'), BASE, 'a', 'confirmed'))
+    expect(p.moves.map(m => m.id)).toEqual(['a'])
+    expect(p.statuses).toEqual([{ id: 'a', title: '작품a', status: 'confirmed' }])
+  })
+
+  test('runSave: 순서 다음에 상태를 고치고 센다, 실패는 목록에 남긴다', async () => {
+    const calls = []
+    const api = {
+      deleteVolumeWork: vi.fn(), ensureWorkId: vi.fn(), insertPlacedWork: vi.fn(),
+      updateVolumeWork: vi.fn(async (id, patch) => {
+        calls.push([id, patch])
+        if (id === 'b') throw new Error('network down')
+        return {}
+      }),
+    }
+    const p = {
+      removes: [], moves: [], adds: [], skipped: [], alreadyRemoved: 0,
+      reorders: [{ groupKey: 'v1|p1|현대', ops: [{ id: 'c', title: 'C', sortOrder: 5 }] }],
+      statuses: [{ id: 'a', title: 'A', status: 'confirmed' }, { id: 'b', title: 'B', status: 'hold' }],
+    }
+    const result = await runSave(p, api, { registryMap: new Map() })
+    expect(calls).toEqual([['c', { sort_order: 5 }], ['a', { selection_status: 'confirmed' }], ['b', { selection_status: 'hold' }]])
+    expect(result.statusChanged).toBe(1)
+    expect(result.failed).toEqual([{ title: 'B', reason: 'network down' }])
+  })
+
+  test('runSave: 옮기기가 실패한 작품은 상태도 바꾸지 않고 건너뛴다', async () => {
+    const api = {
+      deleteVolumeWork: vi.fn(), ensureWorkId: vi.fn(), insertPlacedWork: vi.fn(),
+      updateVolumeWork: vi.fn(async id => { if (id === 'a') throw new Error('network down'); return {} }),
+    }
+    const p = {
+      removes: [], adds: [], reorders: [], skipped: [], alreadyRemoved: 0,
+      moves: [{ id: 'a', title: 'A', volumeId: 'v2', partId: 'q2', sortOrder: 40 }],
+      statuses: [{ id: 'a', title: 'A', status: 'confirmed' }, { id: 'b', title: 'B', status: 'hold' }],
+    }
+    const result = await runSave(p, api, { registryMap: new Map() })
+    expect(api.updateVolumeWork).not.toHaveBeenCalledWith('a', { selection_status: 'confirmed' })
+    expect(api.updateVolumeWork).toHaveBeenCalledWith('b', { selection_status: 'hold' })
+    expect(result.statusChanged).toBe(1)
+    expect(result.failed).toEqual([{ title: 'A', reason: 'network down' }])
+    expect(result.skipped).toEqual([{ title: 'A', reason: '옮기지 못해 상태도 그대로 두었습니다' }])
+  })
+
+  test('runSave: 상태를 고른 넣기는 그 상태로 넣는다', async () => {
+    const api = {
+      deleteVolumeWork: vi.fn(), ensureWorkId: vi.fn(), updateVolumeWork: vi.fn(),
+      insertPlacedWork: vi.fn().mockResolvedValue({ id: 'n' }),
+    }
+    const p = {
+      removes: [], moves: [], reorders: [], statuses: [], skipped: [], alreadyRemoved: 0,
+      adds: [{ tempId: 'n1', title: '돌다리', workId: 'W9', work: SHEET, curricula: [], snapshot: { title: '돌다리' }, volumeId: 'v1', partId: 'p2', sortOrder: 30, status: 'confirmed' }],
+    }
+    await runSave(p, api, { registryMap: new Map() })
+    expect(api.insertPlacedWork).toHaveBeenCalledWith({
+      volumeId: 'v1', workId: 'W9', workSnapshot: { title: '돌다리' }, partId: 'p2', batchId: null, sortOrder: 30, selectionStatus: 'confirmed',
+    })
   })
 })

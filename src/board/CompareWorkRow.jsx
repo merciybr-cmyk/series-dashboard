@@ -1,10 +1,11 @@
 // 권별 비교의 작품 한 줄 (2026-10-02 ComparePage에서 분리):
 // 고전/현대·제목·작가 / 바뀐 표시(편집 중) / 경고 / 다른 권과 겹침 / 선정 상태
+// statusControl(2026-10-06): 편집 중이면 상태 표시 자리에 상태 고르기 단추를 넣는다
 import { SELECTION_LABELS } from './constants.js'
 import { eraOf } from './genreUtils.js'
 import { WARNING_LABELS, expectedPartOf } from './compareUtils.js'
 
-const SELECTION_BADGE = {
+export const SELECTION_BADGE = {
   candidate: 'bg-gray-100 text-gray-700',
   hold: 'bg-yellow-100 text-yellow-800',
   confirmed: 'bg-blue-100 text-blue-800',
@@ -30,7 +31,7 @@ function warningTitle(key, genre) {
 
 export default function CompareWorkRow({
   row, others = [], warnings = [], fromLabel = null, leading = null, trailing = null, dragging = false,
-  insertHint = null, ref,
+  insertHint = null, statusControl = null, ref,
 }) {
   const s = row.work_snapshot || {}
   const removed = !!row._removed
@@ -60,9 +61,11 @@ export default function CompareWorkRow({
         </span>
       ))}
       {isDup && <span className="shrink-0 text-xs text-amber-700">⚠ {others.join('·')}권</span>}
-      <span className={`shrink-0 rounded px-1 py-0.5 text-xs ${SELECTION_BADGE[row.selection_status]}`}>
-        {SELECTION_LABELS[row.selection_status]}
-      </span>
+      {statusControl ?? (
+        <span className={`shrink-0 rounded px-1 py-0.5 text-xs ${SELECTION_BADGE[row.selection_status]}`}>
+          {SELECTION_LABELS[row.selection_status]}
+        </span>
+      )}
       {trailing}
     </li>
   )

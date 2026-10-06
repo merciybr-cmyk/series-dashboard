@@ -379,7 +379,8 @@ export async function updatePlacementBatch(id, patch) {
 }
 
 // 자동 배치 1편 추가. 같은 권에 이미 있으면(23505) null — 호출 측이 '건너뜀'으로 처리
-export async function insertPlacedWork({ volumeId, workId, workSnapshot, partId, batchId, sortOrder }) {
+// selectionStatus를 주지 않으면 DB 기본값(후보) — 권별 비교에서 상태를 골라 넣을 때만 준다 (compare-status)
+export async function insertPlacedWork({ volumeId, workId, workSnapshot, partId, batchId, sortOrder, selectionStatus }) {
   const { data, error } = await supabase.from('volume_works').insert({
     volume_id: volumeId,
     work_id: workId,
@@ -387,6 +388,7 @@ export async function insertPlacedWork({ volumeId, workId, workSnapshot, partId,
     part_id: partId ?? null,
     placement_batch_id: batchId,
     sort_order: sortOrder,
+    ...(selectionStatus ? { selection_status: selectionStatus } : {}),
   }).select().single()
   if (error) {
     if (error.code === '23505') return null

@@ -174,6 +174,17 @@ test('insertPlacedWork: 같은 권 중복(23505)이면 null', async () => {
   expect(row).toBeNull()
 })
 
+test('insertPlacedWork: 선정 상태를 주면 그 상태로, 안 주면 상태 칸 없이(기본값) 넣는다', async () => {
+  const payloads = []
+  const recorder = () => ({ insert: payload => { payloads.push(payload); return chain({ data: { id: 'n' }, error: null }) } })
+  mockSupabase.from.mockImplementationOnce(recorder).mockImplementationOnce(recorder)
+  const args = { volumeId: 'v1', workId: 'W1', workSnapshot: {}, partId: null, batchId: null, sortOrder: 10 }
+  await api.insertPlacedWork({ ...args, selectionStatus: 'confirmed' })
+  await api.insertPlacedWork(args)
+  expect(payloads[0].selection_status).toBe('confirmed')
+  expect('selection_status' in payloads[1]).toBe(false)
+})
+
 test('insertPlacedWork: 그 밖의 오류는 던진다', async () => {
   fromResults.push({ data: null, error: { code: '42501', message: 'denied' } })
   await expect(api.insertPlacedWork({ volumeId: 'v1', workId: 'W1', workSnapshot: {}, partId: null, batchId: 'b1', sortOrder: 10 }))

@@ -1,6 +1,7 @@
 // 권별 비교: 모든 권의 수록 목록을 한 화면에서 나란히 본다 (설계 §10 2c)
 // 2026-10-01: 부 띠·고전/현대 표시(부 안은 고전 → 현대 순)·구성 요약표(부 × 권)
 // 2026-10-02: 작품 줄 경고, 편집 모드(옮기기·빼기·넣기를 모았다가 저장) — docs/superpowers/specs/2026-10-02-compare-edit-design.md
+// 2026-10-06: 편집 중 상태 표시를 눌러 선정 상태(후보·보류·확정)도 바꾼다 — 다른 편집과 함께 저장
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useBlocker } from 'react-router-dom'
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
@@ -15,7 +16,7 @@ import {
 import {
   EMPTY_DRAFT, changeCount, effectiveRows, moveRow, removeRow, revertRow, addWork,
   canPlace, placeErrorText, defaultPartFor, describeDraft, resolveDrop, toDropActive,
-  moveInGroup, revertGroupOrder, resolveAnchor,
+  moveInGroup, revertGroupOrder, resolveAnchor, setStatus,
 } from './compareEdit.js'
 import { groupKeyOfRow, eraKeyOf } from './compareOrder.js'
 import { DraggableWorkRow, DraggableSheetItem, DropZone, visiblePointerWithin } from './CompareDnd.jsx'
@@ -26,6 +27,7 @@ import { planSave, runSave, countAttachments, resultSummary } from './compareSav
 import CompareSaveDialog from './CompareSaveDialog.jsx'
 import CompareWorkRow, { EraChip } from './CompareWorkRow.jsx'
 import CompareMoveMenu from './CompareMoveMenu.jsx'
+import CompareStatusPicker from './CompareStatusPicker.jsx'
 import { useToast } from '../components/Toast.jsx'
 import { downloadCompareExcel } from './exportCompare.js'
 
@@ -400,12 +402,25 @@ export default function ComparePage() {
         confirmText="옮기기"
         onConfirm={(vid, pid) => setDraft(d => moveRow(d, baseline, row.id, vid, pid))}
         onRemove={() => setDraft(d => removeRow(d, row.id, baseline))}
-        onRevert={row._moved || row._added ? () => setDraft(d => revertRow(d, row.id, baseline)) : null}
+        onRevert={row._moved || row._added || row._statusFrom ? () => setDraft(d => revertRow(d, row.id, baseline)) : null}
         order={{
           onUp: i > 0 ? () => setDraft(d => moveInGroup(d, baseline, row.id, -1)) : null,
           onDown: i >= 0 && i < ids.length - 1 ? () => setDraft(d => moveInGroup(d, baseline, row.id, 1)) : null,
           onRevert: draft.orders?.[key] ? () => setDraft(d => revertGroupOrder(d, key)) : null,
         }}
+      />
+    )
+  }
+
+  // 뺀 줄과 제외 작품은 고를 수 없다 — 제외는 고를 수 있는 상태가 아니라서 고르면 되돌릴 길이 없다
+  function statusControl(row) {
+    if (row._removed || (row._statusFrom ?? row.selection_status) === 'excluded') return null
+    return (
+      <CompareStatusPicker
+        title={row.work_snapshot?.title}
+        status={row.selection_status}
+        original={row._statusFrom ?? null}
+        onPick={s => setDraft(d => setStatus(d, baseline, row.id, s))}
       />
     )
   }
@@ -492,6 +507,7 @@ export default function ComparePage() {
                               const rowProps = {
                                 row: w, others, warnings: warnings.get(w.id) || [],
                                 fromLabel: fromLabel(w), trailing: editing ? rowTrailing(w) : null,
+                                statusControl: editing ? statusControl(w) : null,
                                 insertHint: dropHint?.anchorId === w.id ? dropHint.position : null,
                               }
                               return editing && !w._removed

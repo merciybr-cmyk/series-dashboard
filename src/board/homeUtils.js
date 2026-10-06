@@ -101,7 +101,8 @@ export function describeActivity(entry, nameOf, ctx = {}) {
       return `${name} ${what} ${num != null ? `${num}권으로` : '다른 권으로'} 옮겼습니다`
     }
     if (a === 'update' && d.selection_status) {
-      return `${name} 선정 상태를 '${SELECTION_LABELS[d.selection_status[1]] || d.selection_status[1]}'(으)로 변경했습니다`
+      const title = ctx.titleOfVw?.(entry.record_id) // 2026-10-06: 권별 비교에서 여러 편을 바꾸므로 제목을 붙인다
+      return `${name} ${title ? `「${title}」 ` : ''}선정 상태를 '${statusLabel(d.selection_status[1])}'(으)로 변경했습니다`
     }
     if (a === 'update' && d.part_id) return `${name} 작품의 부를 변경했습니다`
     if (a === 'update') return `${name} 작품 정보를 변경했습니다`
@@ -154,9 +155,15 @@ function manualKindOf(entry) {
   if (entry.action === 'insert') return 'add'
   if (entry.action === 'delete') return 'remove'
   if (entry.action === 'update' && entry.diff?.volume_id) return 'move'
+  if (entry.action === 'update' && entry.diff?.selection_status) return `status:${entry.diff.selection_status[1]}`
   return null
 }
 const KIND_VERB = { add: '추가했습니다', remove: '제거했습니다', move: '옮겼습니다' }
+const statusLabel = s => SELECTION_LABELS[s] || s
+// 묶음 문구의 '「첫 작품」 외 N편' 뒤: 상태 변경은 어떤 상태로 바꿨는지까지
+const kindTail = kind => (kind.startsWith('status:')
+  ? `의 선정 상태를 '${statusLabel(kind.slice('status:'.length))}'(으)로 변경했습니다`
+  : `을 ${KIND_VERB[kind]}`)
 
 export function groupActivity(entries, nameOf, limit = 20, ctx = {}) {
   const groups = []
@@ -178,7 +185,8 @@ export function groupActivity(entries, nameOf, limit = 20, ctx = {}) {
       last.oldest = time
       continue
     }
-    const title = kind === 'move' ? ctx.titleOfVw?.(e.record_id) : kind ? e.diff?.work_snapshot?.title : null
+    const byRecord = kind === 'move' || kind?.startsWith('status:') // update 기록에는 제목이 없어 홈이 찾아 준다
+    const title = byRecord ? ctx.titleOfVw?.(e.record_id) : kind ? e.diff?.work_snapshot?.title : null
     groups.push({
       id: e.id, created_at: e.created_at, actor: e.actor_id, action: e.action,
       batch, kind, title, text, count: 1, oldest: time, buckets: new Set(bucket ? [bucket] : []),
@@ -195,8 +203,8 @@ export function groupActivity(entries, nameOf, limit = 20, ctx = {}) {
     } else if (g.count > 1 && g.kind) {
       const who = actorLabel(g.actor, nameOf)
       text = g.title
-        ? `${who} 「${g.title}」 외 ${g.count - 1}편을 ${KIND_VERB[g.kind]}`
-        : `${who} 작품 ${g.count}편을 ${KIND_VERB[g.kind]}`
+        ? `${who} 「${g.title}」 외 ${g.count - 1}편${kindTail(g.kind)}`
+        : `${who} 작품 ${g.count}편${kindTail(g.kind)}`
     } else if (g.count > 1) {
       text = `${text} (${g.count}건)`
     }
