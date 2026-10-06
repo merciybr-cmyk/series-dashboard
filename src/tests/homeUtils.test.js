@@ -168,6 +168,20 @@ describe('groupActivity', () => {
     expect(out[0]).toMatchObject({ id: 4, created_at: at(40) })
   })
 
+  test('선정 상태 변경은 제목을 넣고, 같은 상태로 바꾼 것끼리 「첫 작품」 외 N편으로 묶는다', () => {
+    const ctx = { volumeNumberOf: () => 7, titleOfVw: id => ({ r1: '돌다리', r2: '복덕방', r3: '봄봄' })[id] }
+    const st = (id, record_id, to, min) => ({
+      id, record_id, table_name: 'volume_works', action: 'update', actor_id: 'm1', created_at: at(min),
+      diff: { selection_status: ['candidate', to] },
+    })
+    expect(describeActivity(st(1, 'r1', 'confirmed', 1), nameOf, ctx)).toBe("윤보라님이 「돌다리」 선정 상태를 '확정'(으)로 변경했습니다")
+    const entries = [st(4, 'r1', 'confirmed', 9), st(3, 'r2', 'confirmed', 9), st(2, 'r3', 'hold', 8), st(1, 'gone', 'hold', 8)]
+    expect(groupActivity(entries, nameOf, 20, ctx).map(g => g.text)).toEqual([
+      "윤보라님이 「돌다리」 외 1편의 선정 상태를 '확정'(으)로 변경했습니다",
+      "윤보라님이 「봄봄」 외 1편의 선정 상태를 '보류'(으)로 변경했습니다",
+    ])
+  })
+
   test('손으로 한 추가·제거·권 옮기기는 종류별로 묶는다', () => {
     const ctx = { volumeNumberOf: () => 7, titleOfVw: id => ({ r1: '돌다리', r2: '복덕방' })[id] }
     const mv = (id, record_id, min) => ({

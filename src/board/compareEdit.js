@@ -1,22 +1,26 @@
 // 권별 비교 편집 상태 (설계 2026-10-02 §5): 편집 중 바뀐 내용을 화면에만 모아 둔다. 순수 함수만.
 // draft = { moves: { 행id: { volumeId, partId } }, removes: { 행id: true }, adds: [넣을 작품], orders: { 묶음키: 행id[] } }
 // orders(2026-10-02 compare-order): 같은 부·같은 시대 묶음 안의 원하는 순서
+// statuses(2026-10-06 compare-status): { 행id: 선정 상태 } — 넣는 작품의 상태는 adds[].status에 둔다
 import { bucketOf, eraOf } from './genreUtils.js'
 import { partNumberFor } from './placementUtils.js'
 import { snapshotOf } from '../works/workKey.js'
 import { nextSortOrder } from './boardUtils.js'
+import { SELECTION_LABELS } from './constants.js'
 import { assignSortOrders, groupKeyOf, groupKeyOfRow, eraKeyOf } from './compareOrder.js'
 
-export const EMPTY_DRAFT = { moves: {}, removes: {}, adds: [], orders: {} }
+export const EMPTY_DRAFT = { moves: {}, removes: {}, adds: [], orders: {}, statuses: {} }
 
 const isAdd = (draft, id) => draft.adds.some(a => a.tempId === id)
 const samePart = (a, b) => (a ?? null) === (b ?? null)
 const ordersOf = draft => draft.orders || {}
+const statusesOf = draft => draft.statuses || {}
 const sameList = (a, b) => a.length === b.length && a.every((x, i) => x === b[i])
 
+// 바뀐 작품 수: 옮기기·빼기·상태는 작품(행) 단위로 한 번씩, 넣기는 한 편씩, 순서는 묶음 하나씩
 export function changeCount(draft) {
-  return Object.keys(draft.moves).length + Object.keys(draft.removes).length + draft.adds.length
-    + Object.keys(ordersOf(draft)).length
+  const rowIds = new Set([...Object.keys(draft.moves), ...Object.keys(draft.removes), ...Object.keys(statusesOf(draft))])
+  return rowIds.size + draft.adds.length + Object.keys(ordersOf(draft)).length
 }
 
 // baseline(편집 시작 때 읽은 행)에 draft를 반영한 화면용 행. 표시용 플래그(_moved·_removed·_added)를 붙이고,
@@ -24,14 +28,17 @@ export function changeCount(draft) {
 export function effectiveRows(baseline, draft) {
   const rows = baseline.map(r => {
     if (draft.removes[r.id]) return { ...r, _removed: true }
+    let out = r
     const m = draft.moves[r.id]
-    if (m) return { ...r, volume_id: m.volumeId, part_id: m.partId, _moved: { fromVolumeId: r.volume_id, fromPartId: r.part_id } }
-    return r
+    if (m) out = { ...out, volume_id: m.volumeId, part_id: m.partId, _moved: { fromVolumeId: r.volume_id, fromPartId: r.part_id } }
+    const st = statusesOf(draft)[r.id]
+    if (st) out = { ...out, selection_status: st, _statusFrom: r.selection_status }
+    return out
   })
   for (const a of draft.adds) {
     rows.push({
       id: a.tempId, volume_id: a.volumeId, part_id: a.partId, work_id: a.workId,
-      sort_order: Number.MAX_SAFE_INTEGER, selection_status: 'candidate',
+      sort_order: Number.MAX_SAFE_INTEGER, selection_status: a.status || 'candidate',
       work_snapshot: a.snapshot, _added: true, _key: a.key,
     })
   }
@@ -91,8 +98,10 @@ export function removeRow(draft, rowId, baseline = null) {
   if (isAdd(draft, rowId)) next = { ...draft, adds: draft.adds.filter(a => a.tempId !== rowId) }
   else {
     const moves = { ...draft.moves }
+    const statuses = { ...statusesOf(draft) }
     delete moves[rowId]
-    next = { ...draft, moves, removes: { ...draft.removes, [rowId]: true } }
+    delete statuses[rowId]
+    next = { ...draft, moves, statuses, removes: { ...draft.removes, [rowId]: true } }
   }
   return baseline ? normalizeOrders(next, baseline) : next
 }
@@ -101,10 +110,25 @@ export function revertRow(draft, rowId, baseline = null) {
   if (isAdd(draft, rowId)) return removeRow(draft, rowId, baseline)
   const moves = { ...draft.moves }
   const removes = { ...draft.removes }
+  const statuses = { ...statusesOf(draft) }
   delete moves[rowId]
   delete removes[rowId]
-  const next = { ...draft, moves, removes }
+  delete statuses[rowId]
+  const next = { ...draft, moves, removes, statuses }
   return baseline ? normalizeOrders(next, baseline) : next
+}
+
+// 선정 상태 고르기 (compare-status). 원래 상태로 고르면 바뀐 것에서 뺀다. 넣는 작품은 넣기 항목에 단다. 뺀 행은 그대로
+export function setStatus(draft, baseline, rowId, status) {
+  if (isAdd(draft, rowId)) {
+    return { ...draft, adds: draft.adds.map(a => (a.tempId === rowId ? { ...a, status } : a)) }
+  }
+  const base = baseline.find(r => r.id === rowId)
+  if (!base || draft.removes[rowId]) return draft
+  const statuses = { ...statusesOf(draft) }
+  if (base.selection_status === status) delete statuses[rowId]
+  else statuses[rowId] = status
+  return { ...draft, statuses }
 }
 
 // 검색 패널에서 넣기. workId는 registry에 있으면 그 ID, 없으면 null(저장 때 발급)
@@ -248,7 +272,9 @@ export function describeDraft(draft, baseline, place) {
     items.push({ kind: 'move', rowId: id, title: r?.work_snapshot?.title, from: place(r?.volume_id, r?.part_id), to: place(m.volumeId, m.partId) })
   }
   for (const a of draft.adds) {
-    items.push({ kind: 'add', rowId: a.tempId, title: a.snapshot?.title, to: place(a.volumeId, a.partId) })
+    const item = { kind: 'add', rowId: a.tempId, title: a.snapshot?.title, to: place(a.volumeId, a.partId) }
+    if (a.status && a.status !== 'candidate') item.status = SELECTION_LABELS[a.status]
+    items.push(item)
   }
   for (const id of Object.keys(draft.removes)) {
     const r = byId.get(id)
@@ -257,6 +283,16 @@ export function describeDraft(draft, baseline, place) {
   for (const key of Object.keys(ordersOf(draft))) {
     const [volumeId, partKey, era] = key.split('|')
     items.push({ kind: 'order', rowId: key, title: null, to: `${place(volumeId, partKey === 'none' ? null : partKey)} ${era}` })
+  }
+  // 상태는 옮긴 뒤의 자리로 보여 준다
+  for (const [id, status] of Object.entries(statusesOf(draft))) {
+    const r = byId.get(id)
+    const m = draft.moves[id]
+    items.push({
+      kind: 'status', rowId: id, title: r?.work_snapshot?.title,
+      place: m ? place(m.volumeId, m.partId) : place(r?.volume_id, r?.part_id),
+      from: SELECTION_LABELS[r?.selection_status], to: SELECTION_LABELS[status],
+    })
   }
   return items
 }

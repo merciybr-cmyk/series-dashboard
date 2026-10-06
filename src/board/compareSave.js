@@ -5,6 +5,8 @@ import { assignSortOrders, groupKeyOfRow } from './compareOrder.js'
 const MOVED_AWAY = '그사이 다른 분이 옮기거나 뺐습니다'
 const TAKEN = '그사이 같은 작품이 들어왔습니다'
 const PART_GONE = '옮길 부가 삭제되었습니다'
+const STATUS_CHANGED = '그사이 다른 분이 상태를 바꿨습니다'
+const MOVE_SKIPPED = '옮기지 못해 상태도 그대로 두었습니다'
 
 const slot = (volumeId, workId) => `${volumeId}|${workId}`
 
@@ -102,15 +104,28 @@ export function planSave({ draft, baseline, latestRows, latestParts }) {
       .map(r => ({ id: r.id, title: r.work_snapshot?.title, sortOrder: assigned.get(r.id) })),
   }))
 
-  return { removes, moves, adds, reorders, skipped, alreadyRemoved }
+  // 선정 상태 (compare-status): 편집 시작 때와 자리·상태가 그대로인 행만. 함께 옮기려던 것이 건너뛰어지면 상태도 두고 간다
+  const statuses = []
+  for (const [id, status] of Object.entries(draft.statuses || {})) {
+    const latest = latestById.get(id)
+    const base = baseById.get(id)
+    const title = titleOf(id)
+    if (draft.moves[id] && !movingIds.has(id)) skipped.push({ title, reason: MOVE_SKIPPED })
+    else if (!latest || changedSince(base, latest)) skipped.push({ title, reason: MOVED_AWAY })
+    else if (latest.selection_status !== base.selection_status) skipped.push({ title, reason: STATUS_CHANGED })
+    else statuses.push({ id, title, status })
+  }
+
+  return { removes, moves, adds, reorders, statuses, skipped, alreadyRemoved }
 }
 
 const isDuplicate = err => /duplicate key|23505/i.test(err?.message || '')
 
 // api = { deleteVolumeWork, updateVolumeWork, ensureWorkId, insertPlacedWork } (volumeApi.js)
+// 순서: 빼기 → 옮기기 → 넣기 → 순서 → 상태
 // 한 건이 실패해도 나머지는 계속한다.
 export async function runSave(plan, api, { registryMap }) {
-  const result = { removed: plan.alreadyRemoved, moved: 0, added: 0, reordered: 0, skipped: [...plan.skipped], failed: [] }
+  const result = { removed: plan.alreadyRemoved, moved: 0, added: 0, reordered: 0, statusChanged: 0, skipped: [...plan.skipped], failed: [] }
 
   for (const r of plan.removes) {
     try {
@@ -144,6 +159,7 @@ export async function runSave(plan, api, { registryMap }) {
       const workId = a.workId || await api.ensureWorkId(a.work, a.curricula, registryMap)
       const row = await api.insertPlacedWork({
         volumeId: a.volumeId, workId, workSnapshot: a.snapshot, partId: a.partId, batchId: null, sortOrder: a.sortOrder,
+        ...(a.status ? { selectionStatus: a.status } : {}),
       })
       if (row) result.added++
       else result.skipped.push({ title: a.title, reason: TAKEN })
@@ -164,6 +180,15 @@ export async function runSave(plan, api, { registryMap }) {
       }
     }
     if (ok) result.reordered++
+  }
+
+  for (const st of plan.statuses || []) {
+    try {
+      await api.updateVolumeWork(st.id, { selection_status: st.status })
+      result.statusChanged++
+    } catch (err) {
+      result.failed.push({ title: st.title, reason: err.message })
+    }
   }
   return result
 }
@@ -190,6 +215,6 @@ export function attachmentText(c) {
   return parts.join(' / ')
 }
 
-export function resultSummary({ moved, added, removed, reordered = 0 }) {
-  return `반영했습니다: 옮기기 ${moved} · 넣기 ${added} · 빼기 ${removed} · 순서 ${reordered}`
+export function resultSummary({ moved, added, removed, reordered = 0, statusChanged = 0 }) {
+  return `반영했습니다: 옮기기 ${moved} · 넣기 ${added} · 빼기 ${removed} · 순서 ${reordered} · 상태 ${statusChanged}`
 }
