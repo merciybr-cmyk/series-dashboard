@@ -90,3 +90,28 @@ export function compareWarnings(rows, volumes, parts) {
   }
   return out
 }
+
+// 부 하나만 보기 (2026-10-14): 회의 때 1부 줄에서 모든 권을 한 화면에 모아 본다.
+// 고르기 키 = 부 번호 문자열('1'…) 또는 'none'(미배정), null = 전체.
+// 선택지는 모든 권의 부 번호를 모아 번호순(이름은 먼저 만난 권의 부 이름), 미배정 작품이 있는 권이 하나라도 있으면 끝에 '미배정'.
+export function partOptions(columns) {
+  const byNumber = new Map()
+  let unassigned = false
+  for (const col of columns) {
+    for (const g of col.groups) {
+      if (g.part) {
+        if (!byNumber.has(g.part.number)) byNumber.set(g.part.number, g.label)
+      } else if (g.label === '미배정') unassigned = true
+    }
+  }
+  const out = [...byNumber].sort((a, b) => a[0] - b[0]).map(([n, label]) => ({ key: String(n), label }))
+  if (unassigned) out.push({ key: 'none', label: '미배정' })
+  return out
+}
+
+// 고른 부의 묶음만 남긴다. 권 합계(counts)는 그대로 — 머리줄은 권 전체를 설명한다. 그 부가 없는 권은 묶음이 비게 된다.
+export function filterColumnsByPart(columns, partKey) {
+  if (partKey == null) return columns
+  const match = g => (partKey === 'none' ? !g.part && g.label === '미배정' : !!g.part && String(g.part.number) === partKey)
+  return columns.map(col => ({ ...col, groups: col.groups.filter(match) }))
+}

@@ -2,6 +2,7 @@
 // 2026-10-01: 부 띠·고전/현대 표시(부 안은 고전 → 현대 순)·구성 요약표(부 × 권)
 // 2026-10-02: 작품 줄 경고, 편집 모드(옮기기·빼기·넣기를 모았다가 저장) — docs/superpowers/specs/2026-10-02-compare-edit-design.md
 // 2026-10-06: 편집 중 상태 표시를 눌러 선정 상태(후보·보류·확정)도 바꾼다 — 다른 편집과 함께 저장
+// 2026-10-14: '보는 부' — 부 하나만 남겨 모든 권을 한 화면에 모아 본다 (회의용). 요약표·엑셀은 전체 그대로
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useBlocker } from 'react-router-dom'
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
@@ -12,6 +13,7 @@ import {
 import { eraSummary, eraOf } from './genreUtils.js'
 import {
   buildCompareColumns, compareSummary, compareWarnings, totalOf, volumesByWork as buildVolumesByWork,
+  partOptions, filterColumnsByPart,
 } from './compareUtils.js'
 import {
   EMPTY_DRAFT, changeCount, effectiveRows, moveRow, removeRow, revertRow, addWork,
@@ -74,7 +76,36 @@ function EraBar({ counts }) {
   )
 }
 
-function SummaryTable({ columns }) {
+// 받침 유무로 '이/가'를 고른다 — "1부 시가 없습니다", "3부 수필·극이 없습니다"
+function subjectParticle(text) {
+  const code = text.charCodeAt(text.length - 1)
+  const hangul = code >= 0xac00 && code <= 0xd7a3
+  return hangul && (code - 0xac00) % 28 !== 0 ? '이' : '가'
+}
+
+// 보는 부 고르기: 전체 또는 부 하나(미배정 포함). 보기·편집 모드 공통
+function PartFilter({ options, value, onChange }) {
+  if (!options.length) return null
+  const items = [{ key: null, label: '전체' }, ...options]
+  return (
+    <div role="radiogroup" aria-label="보는 부" className="flex items-center gap-1 text-sm">
+      <span className="text-xs text-gray-500">보는 부</span>
+      {items.map(o => {
+        const on = o.key === value
+        return (
+          <button key={o.key ?? 'all'} type="button" role="radio" aria-checked={on} onClick={() => onChange(o.key)}
+            className={`rounded-full border px-2.5 py-0.5 ${on
+              ? 'border-blue-600 bg-blue-600 font-medium text-white'
+              : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function SummaryTable({ columns, currentLabel = null }) {
   const rows = compareSummary(columns)
   if (!rows.length) return null
   return (
@@ -91,8 +122,10 @@ function SummaryTable({ columns }) {
         <tbody>
           {rows.map(r => {
             const warn = r.label === '미배정'
+            const current = currentLabel != null && r.label === currentLabel
             return (
-              <tr key={r.label} className="border-t border-gray-100">
+              <tr key={r.label} aria-current={current ? 'true' : undefined}
+                className={`border-t border-gray-100 ${current ? 'bg-blue-50' : ''}`}>
                 <th scope="row" className={`px-2 py-1.5 text-left font-semibold ${warn ? 'text-red-600' : 'text-gray-700'}`}>{r.label}</th>
                 {r.cells.map((counts, i) => (
                   <td key={columns[i].volume.id} className="px-2 py-1.5 align-top">
@@ -116,17 +149,19 @@ function SummaryTable({ columns }) {
   )
 }
 
-function PartBand({ group, first }) {
+// compact: 부 하나만 볼 때 — 8권이 한 줄인 아주 넓은 화면에선 비율 막대·고전/현대 수를 숨겨 띠가 한 줄에 들어가게 (요약표에 같은 수가 있다)
+function PartBand({ group, first, compact = false }) {
   const warn = group.label === '미배정'
   const total = totalOf(group.counts)
+  const hideWide = compact ? '@min-[110rem]:hidden' : ''
   return (
     <div data-part-band
       className={`sticky top-0 z-10 flex items-center gap-2 border-t-2 px-2 py-1 text-sm ${first ? '' : 'mt-3'} ${
         warn ? 'border-red-400 bg-red-50 text-red-700' : 'border-gray-400 bg-gray-100 text-gray-800'}`}>
       <span className="font-semibold">{group.label}</span>
       <span className="text-xs text-gray-500">{total}편</span>
-      {warn ? <span className="text-xs">부를 정해 주세요</span> : <EraBar counts={group.counts} />}
-      {total > 0 && <span className="shrink-0 text-xs text-gray-500">{eraSummary(group.counts)}</span>}
+      {warn ? <span className="text-xs">부를 정해 주세요</span> : <div className={`flex min-w-0 flex-1 ${hideWide}`}><EraBar counts={group.counts} /></div>}
+      {total > 0 && <span className={`shrink-0 text-xs text-gray-500 ${hideWide}`}>{eraSummary(group.counts)}</span>}
     </div>
   )
 }
@@ -137,6 +172,7 @@ export default function ComparePage() {
   const [allParts, setAllParts] = useState([])
   const [loading, setLoading] = useState(true)
   const [confirmedOnly, setConfirmedOnly] = useState(false)
+  const [partKey, setPartKey] = useState(null) // 보는 부: null = 전체, '1'… = 부 번호, 'none' = 미배정
   const [editing, setEditing] = useState(false)
   const [baseline, setBaseline] = useState([])
   const [draft, setDraft] = useState(EMPTY_DRAFT)
@@ -202,6 +238,22 @@ export default function ComparePage() {
     () => buildDuplicatesByKey(lookup.registry, rows, id => numberById[id]),
     [lookup.registry, rows, numberById],
   )
+  // 보는 부: 선택지에 없어진 키(예: 미배정 작품이 다 정리됨)는 전체로 본다
+  const partChoices = useMemo(() => partOptions(columns), [columns])
+  const shownPart = partChoices.find(o => o.key === partKey) ?? null
+  const shownKey = shownPart?.key ?? null
+  const visibleColumns = useMemo(() => filterColumnsByPart(columns, shownKey), [columns, shownKey])
+  // 옮기기·넣기의 목적지가 지금 보는 부 밖이면 작품이 화면에서 사라지므로 알려 준다
+  const destinationHidden = (volumeId, partId) => {
+    if (shownKey == null) return false
+    if (partId) return String(partById.get(partId)?.number) !== shownKey
+    return !(shownKey === 'none' && (partsByVolume.get(volumeId) || []).length > 0)
+  }
+  const noteIfHidden = (title, volumeId, partId, verb) => {
+    if (destinationHidden(volumeId, partId)) {
+      show(`「${title}」을 ${place(volumeId, partId)}에 ${verb}. '${shownPart.label}'만 보고 있어 화면에서는 안 보입니다.`)
+    }
+  }
 
   // 나가기 방지 (설계 §4.3): 앱 안 이동은 확인 창, 새로고침·탭 닫기는 브라우저 기본 확인
   const blocker = useBlocker(dirtyCount > 0)
@@ -371,9 +423,12 @@ export default function ComparePage() {
         initialPartFor={vid => partFor(work['장르'], vid)}
         blockedText={vid => blockedFor({ workId, key }, vid)}
         confirmText="넣기"
-        onConfirm={(vid, pid) => setDraft(d => addWork(d, {
-          tempId: newTempId(), workId, key, work, curricula: getCurricula(), volumeId: vid, partId: pid,
-        }))}
+        onConfirm={(vid, pid) => {
+          setDraft(d => addWork(d, {
+            tempId: newTempId(), workId, key, work, curricula: getCurricula(), volumeId: vid, partId: pid,
+          }))
+          noteIfHidden(work['작품명'], vid, pid, '넣었습니다')
+        }}
       />
     )
   }
@@ -400,7 +455,10 @@ export default function ComparePage() {
         initialPartFor={vid => (vid === row.volume_id ? row.part_id : partFor(row.work_snapshot?.genre, vid))}
         blockedText={vid => blockedFor({ workId: row.work_id, key: row._key, selfId: row.id }, vid)}
         confirmText="옮기기"
-        onConfirm={(vid, pid) => setDraft(d => moveRow(d, baseline, row.id, vid, pid))}
+        onConfirm={(vid, pid) => {
+          setDraft(d => moveRow(d, baseline, row.id, vid, pid))
+          noteIfHidden(title, vid, pid, '옮겼습니다')
+        }}
         onRemove={() => setDraft(d => removeRow(d, row.id, baseline))}
         onRevert={row._moved || row._added || row._statusFrom ? () => setDraft(d => revertRow(d, row.id, baseline)) : null}
         order={{
@@ -431,6 +489,7 @@ export default function ComparePage() {
     <div className="sticky top-0 z-30 mb-3 flex flex-wrap items-center gap-3 rounded border border-blue-200 bg-blue-50 px-3 py-2">
       <h2 className="text-lg font-bold">권별 비교</h2>
       <span className="text-sm text-blue-800">편집 중 · 바뀐 작품 {dirtyCount}건</span>
+      <PartFilter options={partChoices} value={shownKey} onChange={setPartKey} />
       <div className="ml-auto flex gap-2">
         <button type="button" onClick={togglePanel} aria-pressed={panelOpen}
           className={`rounded border px-3 py-1 text-sm ${panelOpen ? 'border-blue-600 bg-blue-600 text-white' : 'border-blue-300 bg-white text-blue-700'}`}>
@@ -449,11 +508,16 @@ export default function ComparePage() {
         <input type="checkbox" checked={confirmedOnly} onChange={e => setConfirmedOnly(e.target.checked)} />
         확정만 보기
       </label>
+      <PartFilter options={partChoices} value={shownKey} onChange={setPartKey} />
       <span className="flex items-center gap-1 text-xs text-gray-500">
         <EraChip era="고전" /> 고전운문·고전소설·고전수필·고전극
         <EraChip era="현대" /> 시·소설·수필·극본
       </span>
-      <span className="text-xs text-gray-400">노란 배경 = 다른 권과 겹치는 작품 · 편수·비율과 겹침은 제외 상태를 뺀 기준</span>
+      <span className="text-xs text-gray-400">
+        {shownKey != null
+          ? '부 하나만 보는 중 — 아주 넓은 화면(또는 브라우저 축소)에서는 8권이 한 줄로 · 요약표·엑셀은 전체 그대로'
+          : '노란 배경 = 다른 권과 겹치는 작품 · 편수·비율과 겹침은 제외 상태를 뺀 기준'}
+      </span>
       <div className="ml-auto flex gap-2">
         <button type="button" onClick={enterEdit} disabled={!volumes.length}
           className="rounded border border-blue-300 px-3 py-1 text-sm text-blue-700 hover:bg-blue-50 disabled:opacity-40">
@@ -478,15 +542,19 @@ export default function ComparePage() {
       {saveResult && <SaveResult result={saveResult} onClose={() => setSaveResult(null)} />}
       <div className="flex items-start gap-4">
         <div className="@container min-w-0 flex-1">
-          <SummaryTable columns={columns} />
-          <div className="grid gap-4 pb-4 @2xl:grid-cols-2 @4xl:grid-cols-3 @7xl:grid-cols-4">
-            {columns.map(({ volume: v, groups, counts }) => {
+          <SummaryTable columns={columns} currentLabel={shownPart?.label ?? null} />
+          {/* 부 하나만 볼 때는 아주 넓은 화면(약 1760px 이상, 브라우저 축소 포함)에서 8권을 한 줄에 — 제목은 줄임표, 전체는 풍선 도움말 */}
+          <div data-compare-grid className={`grid gap-4 pb-4 @2xl:grid-cols-2 @4xl:grid-cols-3 @7xl:grid-cols-4 ${
+            shownKey != null ? '@min-[110rem]:grid-cols-8' : ''}`}>
+            {visibleColumns.map(({ volume: v, groups, counts }) => {
               const name = `${v.number}권 ${v.title}`
               const meta = [`${totalOf(counts)}편`, eraSummary(counts), v.status].filter(Boolean).join(' · ')
-              const hasParts = groups.some(g => g.label)
+              // 부 유무는 걸러지기 전 기준 — '미배정'만 볼 때 그 묶음이 놓을 곳으로 바뀌면 안 된다
+              const hasParts = (partsByVolume.get(v.id) || []).length > 0
               const invalid = !!dragRef && overVolumeId === v.id && !!blockedFor(dragRef, v.id)
               const headClass = 'block border-b border-gray-200 bg-gray-50 px-3 py-2 font-semibold'
-              const head = <>{name}<span className="ml-2 text-xs font-normal text-gray-500">{meta}</span></>
+              // 8권 한 줄일 때는 머리줄의 편수·비율을 숨긴다 (요약표와 띠에 있다)
+              const head = <>{name}<span className={`ml-2 text-xs font-normal text-gray-500 ${shownKey != null ? '@min-[110rem]:hidden' : ''}`}>{meta}</span></>
               return (
                 <section key={v.id} aria-label={name}
                   className={`rounded border ${invalid ? 'border-red-400 ring-2 ring-red-300' : 'border-gray-200'}`}>
@@ -500,7 +568,7 @@ export default function ComparePage() {
                       const droppable = !!(g.part || !hasParts)
                       const body = (
                         <>
-                          {g.label && <PartBand group={g} first={i === 0} />}
+                          {g.label && <PartBand group={g} first={i === 0} compact={shownKey != null} />}
                           <ul className="mt-1 space-y-0.5">
                             {g.works.map(w => {
                               const others = (volumesByWork.get(w.work_id) || []).filter(id => id !== v.id).map(id => numberById[id]).sort((a, b) => a - b)
@@ -522,6 +590,11 @@ export default function ComparePage() {
                         ? <DropZone key={key} volumeId={v.id} partId={g.part?.id ?? null}>{body}</DropZone>
                         : <div key={key}>{body}</div>
                     })}
+                    {!groups.length && shownPart && (
+                      <p className="py-2 text-xs text-gray-400">
+                        {shownKey === 'none' ? '미배정 작품이 없습니다' : `이 권에는 ${shownPart.label}${subjectParticle(shownPart.label)} 없습니다`}
+                      </p>
+                    )}
                   </div>
                 </section>
               )
