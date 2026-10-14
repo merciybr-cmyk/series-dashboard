@@ -116,3 +116,33 @@ test('volumesByWork: work_id가 없는 행(registry에 없는 새로 넣은 작�
   expect(map.has(undefined)).toBe(false)
   expect(map.get('W1')).toEqual(['v1'])
 })
+
+// 2026-10-14: 부 하나만 보기 — 회의 때 1부 줄에서 모든 권을 한 화면에 모아 본다
+test('partOptions: 모든 권의 부 번호를 모아 번호순으로, 미배정 작품이 있으면 끝에 미배정을 더한다', async () => {
+  const { partOptions } = await import('../board/compareUtils.js')
+  const cols = buildCompareColumns({ volumes: VOLUMES, allVw: VW, allParts: PARTS, confirmedOnly: false })
+  expect(partOptions(cols)).toEqual([
+    { key: '1', label: '1부 시' },
+    { key: '2', label: '2부 소설' },
+    { key: 'none', label: '미배정' },
+  ])
+})
+
+test('partOptions: 부가 하나도 없으면 빈 목록', async () => {
+  const { partOptions } = await import('../board/compareUtils.js')
+  const cols = buildCompareColumns({ volumes: [VOLUMES[0]], allVw: VW, allParts: [], confirmedOnly: false })
+  expect(partOptions(cols)).toEqual([])
+})
+
+test('filterColumnsByPart: 고른 부의 묶음만 남기고, 그 부가 없는 권은 빈 묶음 목록이 된다', async () => {
+  const { filterColumnsByPart } = await import('../board/compareUtils.js')
+  const cols = buildCompareColumns({ volumes: VOLUMES, allVw: VW, allParts: PARTS, confirmedOnly: false })
+  expect(filterColumnsByPart(cols, null)).toBe(cols) // 전체는 그대로
+  const [v1, v2] = filterColumnsByPart(cols, '2')
+  expect(v1.groups.map(g => g.label)).toEqual(['2부 소설'])
+  expect(v1.counts).toEqual(cols[0].counts) // 권 합계는 그대로
+  expect(v2.groups).toEqual([])
+  const [u1, u2] = filterColumnsByPart(cols, 'none')
+  expect(u1.groups.map(g => g.label)).toEqual(['미배정'])
+  expect(u2.groups).toEqual([]) // 부 없는 권의 단일 묶음은 미배정이 아니다
+})
