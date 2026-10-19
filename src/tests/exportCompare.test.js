@@ -32,17 +32,21 @@ test('buildCompareWorkbook: 부별 탭 → 전체 배치(권=열, 부 머리줄)
   expect(wb.SheetNames).toEqual(['1부 시', '미배정', '전체 배치', '전체 목록'])
   const ov = wb.Sheets['전체 배치']
   expect(ov['A1'].v).toBe('1권 삶')
-  expect(ov['B1'].v).toBe('2권 성장')
+  expect(ov['C1'].v).toBe('2권 성장')                       // 권마다 작품·상태 두 열
+  expect(ov['!merges']).toContainEqual({ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }) // 권 머리줄은 두 열을 합친다
   expect(ov['A1'].s.fill.fgColor.rgb).toBe('4472C4')
   expect(ov['A2'].v).toBe('[1부 시] 현대 1')
-  expect(ov['A3'].v).toBe('소나기 (황순원) · 확정')          // 전체 배치엔 상태 띠가 없어 작품 칸에 상태를 붙인다
+  expect(ov['A3'].v).toBe('소나기 (황순원)')
+  expect(ov['B3'].v).toBe('확정')                            // 상태는 옆 열에 (2026-10-19)
   expect(ov['A3'].s.fill.fgColor.rgb).toBe('FFF2CC') // 다른 권과 겹침
   expect(ov['A4'].v).toBe('[미배정] 현대 1')
-  expect(ov['B2']?.v ?? '').toBe('')                         // 2권엔 1부가 없다 → 띠 글자 없이 색만
-  expect(ov['B2'].s.fill.fgColor.rgb).toBe('DDEBF7')
-  expect(ov['B6'].v).toBe('[부 없음] 현대 1')                 // 부 없는 권의 작품은 '부 없음' 띠(맨 끝)에 — 띠 줄을 권끼리 맞춘다
-  expect(ov['B7'].v).toBe('소나기 (황순원) · 후보')
-  expect(ov['B8']?.v ?? '').toBe('')                         // '제외' 작품(풀)은 전체 배치에서 뺀다
+  expect(ov['C2']?.v ?? '').toBe('')                         // 2권엔 1부가 없다 → 띠 글자 없이 색만
+  expect(ov['C2'].s.fill.fgColor.rgb).toBe('DDEBF7')
+  expect(ov['D2'].s.fill.fgColor.rgb).toBe('DDEBF7')         // 띠 색은 상태 열까지
+  expect(ov['C6'].v).toBe('[부 없음] 현대 1')                 // 부 없는 권의 작품은 '부 없음' 띠(맨 끝)에 — 띠 줄을 권끼리 맞춘다
+  expect(ov['C7'].v).toBe('소나기 (황순원)')
+  expect(ov['D7'].v).toBe('후보')
+  expect(ov['C8']?.v ?? '').toBe('')                         // '제외' 작품(풀)은 전체 배치에서 뺀다
   const list = wb.Sheets['전체 목록']
   expect(list['E2'].v).toBe('소나기')
   expect(list['A1'].s.font.bold).toBe(true)
@@ -58,13 +62,15 @@ test('부 안에서는 화면처럼 고전 → 현대 순서, 순서 번호도 �
   expect(rows.map(r => [r['순서'], r['작품명'], r['고전/현대']])).toEqual([[1, '홍길동전', '고전'], [2, '소나기', '현대']])
   const ov = buildCompareWorkbook(args).Sheets['전체 배치']
   expect(ov['A2'].v).toBe('[1부 시] 고전 1 · 현대 1')
-  expect(ov['A3'].v).toBe('홍길동전 (허균) · 후보')
+  expect(ov['A3'].v).toBe('홍길동전 (허균)')
+  expect(ov['B3'].v).toBe('후보')
 })
 
-test('전체 배치: 작가명이 비어 있으면 작품명과 상태만', () => {
+test('전체 배치: 작가명이 비어 있으면 작품명만, 상태는 옆 열', () => {
   const vw = [{ id: 'a', volume_id: 'v1', work_id: 'W1', part_id: 'p1', sort_order: 10, selection_status: 'candidate', work_snapshot: { title: '청산별곡', author: '', genre: '고전운문' } }]
   const ov = buildCompareWorkbook({ volumes: VOLUMES.slice(0, 1), allVw: vw, allParts: PARTS, confirmedOnly: false }).Sheets['전체 배치']
-  expect(ov['A3'].v).toBe('청산별곡 · 후보')
+  expect(ov['A3'].v).toBe('청산별곡')
+  expect(ov['B3'].v).toBe('후보')
 })
 
 // 2026-10-14: 부별 탭 — 회의 때 1부 줄에서 8권을 비교하려고. 각 권 열 안은 확정 → 후보 → 보류 띠로 나누고, 띠 안은 화면처럼 고전 → 현대
@@ -141,7 +147,31 @@ test('전체 배치: 부 띠가 모든 권에서 같은 행에 온다 (짧은 �
   ]
   const ov = buildCompareWorkbook({ volumes: VOLUMES, allVw: vw, allParts: parts, confirmedOnly: false }).Sheets['전체 배치']
   const col = c => Array.from({ length: 6 }, (_, r) => ov[`${c}${r + 1}`]?.v ?? '')
-  expect(col('A')).toEqual(['1권 삶', '[1부 시] 현대 2', '산유화 (김소월) · 후보', '진달래꽃 (김소월) · 후보', '[2부 소설] 현대 1', '소나기 (황순원) · 후보'])
-  expect(col('B')).toEqual(['2권 성장', '[1부 시] 현대 1', '풀 (김수영) · 후보', '', '[2부 소설] 현대 1', '메밀꽃 필 무렵 (이효석) · 후보'])
-  expect(ov['B5'].s.fill.fgColor.rgb).toBe('DDEBF7')
+  expect(col('A')).toEqual(['1권 삶', '[1부 시] 현대 2', '산유화 (김소월)', '진달래꽃 (김소월)', '[2부 소설] 현대 1', '소나기 (황순원)'])
+  expect(col('B')).toEqual(['', '', '후보', '후보', '', '후보'])
+  expect(col('C')).toEqual(['2권 성장', '[1부 시] 현대 1', '풀 (김수영)', '', '[2부 소설] 현대 1', '메밀꽃 필 무렵 (이효석)'])
+  expect(ov['C5'].s.fill.fgColor.rgb).toBe('DDEBF7')
+})
+
+
+// 2026-10-19: 전체 배치 — 부 안에서 확정 작품을 먼저, 그다음 후보, 보류. 같은 상태 안은 화면 순서(고전 → 현대)
+test('전체 배치: 부 안에서 확정 → 후보 → 보류 순서, 같은 상태 안은 고전 → 현대', () => {
+  const vw = [
+    { id: 'a', volume_id: 'v1', work_id: 'W1', part_id: 'p1', sort_order: 10, selection_status: 'candidate', work_snapshot: { title: '소나기', author: '황순원', genre: '소설' } },
+    { id: 'b', volume_id: 'v1', work_id: 'W2', part_id: 'p1', sort_order: 20, selection_status: 'hold', work_snapshot: { title: '산유화', author: '김소월', genre: '시' } },
+    { id: 'c', volume_id: 'v1', work_id: 'W3', part_id: 'p1', sort_order: 30, selection_status: 'confirmed', work_snapshot: { title: '진달래꽃', author: '김소월', genre: '시' } },
+    { id: 'd', volume_id: 'v1', work_id: 'W4', part_id: 'p1', sort_order: 40, selection_status: 'confirmed', work_snapshot: { title: '홍길동전', author: '허균', genre: '고전소설' } },
+    { id: 'e', volume_id: 'v1', work_id: 'W5', part_id: 'p1', sort_order: 50, selection_status: 'excluded', work_snapshot: { title: '풀', author: '김수영', genre: '시' } },
+  ]
+  const ov = buildCompareWorkbook({ volumes: VOLUMES.slice(0, 1), allVw: vw, allParts: PARTS, confirmedOnly: false }).Sheets['전체 배치']
+  const rows = Array.from({ length: 6 }, (_, r) => [ov[`A${r + 1}`]?.v ?? '', ov[`B${r + 1}`]?.v ?? ''])
+  expect(rows).toEqual([
+    ['1권 삶', ''],
+    ['[1부 시] 고전 1 · 현대 3', ''],
+    ['홍길동전 (허균)', '확정'],
+    ['진달래꽃 (김소월)', '확정'],
+    ['소나기 (황순원)', '후보'],
+    ['산유화 (김소월)', '보류'],
+  ])
+  expect(ov['!cols'].map(c => c.wch)).toEqual([32, 6])
 })
