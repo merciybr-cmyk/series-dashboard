@@ -1,10 +1,40 @@
 // 권 보드의 모든 Supabase 호출. UI는 이 모듈만 통해 서버와 대화한다.
 import { supabase } from '../lib/supabaseClient'
 import { keyOf, snapshotOf } from '../works/workKey.js'
+import { getWorks } from '../works/useWorksData.js'
+import { buildSheetIndex, freshenRows } from '../works/freshSnapshot.js'
 
 function unwrap({ data, error }) {
   if (error) throw new Error(error.message)
   return data
+}
+
+// ---------- 저장된 snapshot → 지금 시트 값 (2026-10-25) ----------
+// 시트 인덱스·registry는 세션당 한 번. 시트를 못 불러오면 캐시하지 않고 저장된 값 그대로 돌려준다.
+let freshCtx = null
+export function _resetFreshCache() { // 테스트 전용
+  freshCtx = null
+}
+
+function loadFreshCtx() {
+  freshCtx = freshCtx || (async () => {
+    const works = await getWorks()
+    const registry = await listRegistry()
+    return { index: buildSheetIndex(works), registryById: new Map(registry.map(r => [r.work_id, r])) }
+  })().catch(() => {
+    freshCtx = null
+    return null
+  })
+  return freshCtx
+}
+
+async function freshen(rows) {
+  const ctx = await loadFreshCtx()
+  return ctx ? freshenRows(rows, ctx.registryById, ctx.index) : rows
+}
+
+async function freshenOne(row) {
+  return (await freshen([row]))[0]
 }
 
 // Supabase(PostgREST)는 한 번에 최대 1000행만 돌려준다 — 끝까지 나눠 받는다.
@@ -44,9 +74,9 @@ export async function getBoard(volumeId) {
   const parts = unwrap(
     await supabase.from('volume_parts').select('*').eq('volume_id', volumeId).order('number'),
   )
-  const works = unwrap(
+  const works = await freshen(unwrap(
     await supabase.from('volume_works').select('*').eq('volume_id', volumeId).order('sort_order'),
-  )
+  ))
   const ids = works.map(w => w.id)
   const tasks = ids.length
     ? unwrap(await supabase.from('work_tasks').select('*').in('volume_work_id', ids).order('sort_order'))
@@ -56,9 +86,9 @@ export async function getBoard(volumeId) {
 
 // 중복 수록 뱃지용: 전체 권의 수록 현황 (권 번호 포함)
 export async function listAllVolumeWorks() {
-  return selectAll(() => supabase.from('volume_works')
+  return freshen(await selectAll(() => supabase.from('volume_works')
     .select('id, volume_id, work_id, part_id, sort_order, selection_status, work_snapshot, volumes(number, title)')
-    .order('id'))
+    .order('id')))
 }
 
 // ---------- works_registry ----------
@@ -131,7 +161,7 @@ export async function addWorkToVolume({ volumeId, work, curricula, registryMap, 
 }
 
 export async function updateVolumeWork(id, patch) {
-  return unwrap(await supabase.from('volume_works').update(patch).eq('id', id).select().single())
+  return freshenOne(unwrap(await supabase.from('volume_works').update(patch).eq('id', id).select().single()))
 }
 
 export async function deleteVolumeWork(id) {
@@ -186,10 +216,10 @@ export async function deleteComment(id) {
 // ---------- 전역 조회 (홈 화면) ----------
 
 export async function listAllTasks() {
-  return unwrap(
+  return freshen(unwrap(
     await supabase.from('work_tasks')
       .select('*, volume_works(id, volume_id, work_id, selection_status, work_snapshot, volumes(number, title))'),
-  )
+  ))
 }
 
 export async function listAllFiles() {
@@ -285,7 +315,7 @@ export async function addLibraryLink(name, url, volumeId = null) {
 // ---------- genre_picks (갈래별 후보 — 권 배치 전 롱리스트) ----------
 
 export async function listPicks() {
-  return selectAll(() => supabase.from('genre_picks').select('*').order('created_at').order('id'))
+  return freshen(await selectAll(() => supabase.from('genre_picks').select('*').order('created_at').order('id')))
 }
 
 export async function addPick({ work, curricula, registryMap }) {
@@ -398,11 +428,11 @@ export async function insertPlacedWork({ volumeId, workId, workSnapshot, partId,
 }
 
 export async function listBatchWorks(batchId) {
-  return unwrap(
+  return freshen(unwrap(
     await supabase.from('volume_works')
       .select('id, volume_id, work_id, part_id, selection_status, work_snapshot, volumes(number)')
       .eq('placement_batch_id', batchId),
-  )
+  ))
 }
 
 // 되돌리기 판정용: 행들에 딸린 업무·의견·자료의 volume_work_id

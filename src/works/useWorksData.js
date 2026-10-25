@@ -18,6 +18,16 @@ async function loadWorks() {
   return parseCSV(await res.text())
 }
 
+// 훅 밖(volumeApi 등)에서 같은 캐시로 시트를 받는다 — 화면과 중복 fetch 없음
+export function getWorks() {
+  if (cache) return Promise.resolve(cache)
+  inflight = inflight || loadWorks()
+  return inflight.then(
+    data => { cache = data; return data },
+    err => { inflight = null; throw err },
+  )
+}
+
 export function useWorksData() {
   const [works, setWorks] = useState(cache || [])
   const [loading, setLoading] = useState(!cache)

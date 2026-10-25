@@ -22,6 +22,10 @@ const mockSupabase = {
   removeChannel: vi.fn(),
 }
 vi.mock('../lib/supabaseClient', () => ({ supabase: mockSupabase }))
+const sheet = { works: null } // null이면 시트 로드 실패
+vi.mock('../works/useWorksData.js', () => ({
+  getWorks: () => (sheet.works ? Promise.resolve(sheet.works) : Promise.reject(new Error('시트 없음'))),
+}))
 
 const api = await import('../board/volumeApi.js')
 const { keyOf } = await import('../works/workKey.js')
@@ -29,6 +33,34 @@ const { keyOf } = await import('../works/workKey.js')
 beforeEach(() => {
   fromResults.length = 0
   mockSupabase.from.mockClear()
+  sheet.works = null
+  api._resetFreshCache()
+})
+
+const OLD_SNAP = { title: '도산십이곡', author: '이황', genre: '고전운문', curriculum: ['6차'] }
+const SHEET_ROWS = ['1차', '6차'].map(c => ({ 교육과정: c, 작품명: '도산십이곡', 지은이: '이황', _authorBase: '이황', 장르: '고전운문' }))
+const REGISTRY = [{ work_id: 'W000150', title: '도산십이곡', author_base: '이황', aliases: [] }]
+
+test('listAllVolumeWorks: 저장된 snapshot을 지금 시트 값으로 바꿔 돌려준다', async () => {
+  sheet.works = SHEET_ROWS
+  fromResults.push({ data: [{ id: 'vw1', work_id: 'W000150', work_snapshot: OLD_SNAP }], error: null })
+  fromResults.push({ data: REGISTRY, error: null })
+  const [row] = await api.listAllVolumeWorks()
+  expect(row.work_snapshot.curriculum).toEqual(['1차', '6차'])
+})
+
+test('listPicks: 시트를 못 불러오면 저장된 snapshot 그대로', async () => {
+  fromResults.push({ data: [{ id: 'p1', work_id: 'W000150', work_snapshot: OLD_SNAP }], error: null })
+  const [row] = await api.listPicks()
+  expect(row.work_snapshot).toEqual(OLD_SNAP)
+})
+
+test('updateVolumeWork: 상태를 바꾼 뒤 돌려받는 행도 시트 값으로', async () => {
+  sheet.works = SHEET_ROWS
+  fromResults.push({ data: { id: 'vw1', work_id: 'W000150', work_snapshot: OLD_SNAP }, error: null })
+  fromResults.push({ data: REGISTRY, error: null })
+  const row = await api.updateVolumeWork('vw1', { selection_status: 'confirmed' })
+  expect(row.work_snapshot.curriculum).toEqual(['1차', '6차'])
 })
 
 const WORK = { '작품명': '소나기', '지은이': '황순원', _authorBase: '황순원', '장르': '소설', '교육과정': '7차' }
